@@ -28,7 +28,7 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.location.reload()}>
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={onEventsClick}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-lg shadow-blue-600/20 group-hover:scale-105 transition-transform overflow-hidden">
             <img src={compassLogo} alt="Logo" className="w-full h-full object-cover mix-blend-screen" />
           </div>

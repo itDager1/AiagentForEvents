@@ -9,12 +9,13 @@ import { getAIRecommendations } from './utils/aiService';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Input } from './components/ui/input';
-import { Bot, Sparkles, Filter } from 'lucide-react';
+import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Toaster } from 'sonner@2.0.3';
 import { supabase } from './utils/supabaseClient';
 import { fetchEvents, seedEvents, toggleRegistration, getUserProfile, createUserProfile } from './utils/dbService';
+import { ImageWithFallback } from './components/figma/ImageWithFallback';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +28,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<EventCategory | 'All'>('All');
   const [formatFilter, setFormatFilter] = useState<'All' | 'Онлайн' | 'Оффлайн'>('All');
+  const [sortOrder, setSortOrder] = useState<'date_asc' | 'date_desc' | 'title_asc'>('date_asc');
 
   // AI State
   const [aiRecommendations, setAiRecommendations] = useState<Event[]>([]);
@@ -167,14 +169,25 @@ export default function App() {
   };
 
   // Filter logic
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(search.toLowerCase()) || 
-                          event.description.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === 'All' || event.category === categoryFilter;
-    const matchesFormat = formatFilter === 'All' || event.format === formatFilter;
-    
-    return matchesSearch && matchesCategory && matchesFormat;
-  });
+  const filteredEvents = events
+    .filter(event => {
+      const matchesSearch = event.title.toLowerCase().includes(search.toLowerCase()) || 
+                            event.description.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = categoryFilter === 'All' || event.category === categoryFilter;
+      const matchesFormat = formatFilter === 'All' || event.format === formatFilter;
+      
+      return matchesSearch && matchesCategory && matchesFormat;
+    })
+    .sort((a, b) => {
+        if (sortOrder === 'date_asc') {
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+        } else if (sortOrder === 'date_desc') {
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        } else if (sortOrder === 'title_asc') {
+            return a.title.localeCompare(b.title);
+        }
+        return 0;
+    });
 
   if (loading) {
       return <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
@@ -249,22 +262,105 @@ export default function App() {
               </div>
             </div>
 
-            {/* AI Recommendations Section (if any) */}
+            {/* AI Recommendations Section (List View) */}
             {aiRecommendations.length > 0 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center gap-2 mb-6 pl-2">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-2xl font-bold text-slate-900">Рекомендовано для вас</h2>
+              <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-6">
+                <div className="flex items-center gap-3 pl-2">
+                  <div className="bg-blue-100 p-2 rounded-lg">
+                    <Sparkles className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Персональные рекомендации</h2>
+                    <p className="text-slate-500 text-sm">Подобрано специально для вас на основе ваших интересов и графика</p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {aiRecommendations.map(event => (
-                    <EventCard 
-                      key={event.id} 
-                      event={event} 
-                      isRegistered={user?.myEventIds.includes(event.id)}
-                      onToggleRegister={toggleRegister}
-                    />
-                  ))}
+                
+                <div className="space-y-4">
+                  {aiRecommendations.map((event, index) => {
+                    const isRegistered = user?.myEventIds.includes(event.id);
+                    return (
+                      <div 
+                        key={event.id} 
+                        className="group bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col md:flex-row gap-6"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        {/* Image Section */}
+                        <div className="w-full md:w-64 h-48 shrink-0 relative rounded-2xl overflow-hidden">
+                          <ImageWithFallback 
+                            src={event.image} 
+                            alt={event.title} 
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute top-3 left-3">
+                            <Badge className="bg-white/95 text-slate-900 backdrop-blur-md shadow-sm border-none">
+                              {event.category}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Content Section */}
+                        <div className="flex-1 flex flex-col">
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight">
+                              {event.title}
+                            </h3>
+                            <Badge variant="outline" className="shrink-0 hidden sm:flex bg-slate-50">
+                              {event.format}
+                            </Badge>
+                          </div>
+
+                          <p className="text-slate-600 leading-relaxed mb-4 line-clamp-3">
+                            {event.description}
+                          </p>
+
+                          <div className="flex flex-wrap gap-3 mb-6">
+                            <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                              <Calendar className="w-4 h-4 text-blue-500" />
+                              {new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                              <Clock className="w-4 h-4 text-blue-500" />
+                              {new Date(event.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                              <MapPin className="w-4 h-4 text-blue-500" />
+                              {event.location}
+                            </div>
+                          </div>
+
+                          <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
+                             <div className="flex flex-wrap gap-2">
+                               {event.tags.slice(0, 3).map(tag => (
+                                 <span key={tag} className="text-xs font-medium text-slate-400">#{tag}</span>
+                               ))}
+                             </div>
+                             
+                             <Button 
+                               onClick={() => toggleRegister(event.id)}
+                               variant={isRegistered ? "outline" : "default"}
+                               className={`rounded-xl transition-all ${
+                                 isRegistered 
+                                   ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800' 
+                                   : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
+                               }`}
+                             >
+                               {isRegistered ? (
+                                 <>
+                                   <Check className="w-4 h-4 mr-2" />
+                                   Вы записаны
+                                 </>
+                               ) : (
+                                 <>
+                                   Записаться
+                                   <ArrowRight className="w-4 h-4 ml-2" />
+                                 </>
+                               )}
+                             </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -291,9 +387,9 @@ export default function App() {
                    <SelectContent>
                      <SelectItem value="All">Все категории</SelectItem>
                      <SelectItem value="Обучение">Обучение</SelectItem>
-                     <SelectItem value="Спорт">Спорт</SelectItem>
-                     <SelectItem value="Корпоратив">Корпоратив</SelectItem>
                      <SelectItem value="Хакатон">Хакатон</SelectItem>
+                     <SelectItem value="Митап">Митап</SelectItem>
+                     <SelectItem value="Конференция">Конференция</SelectItem>
                    </SelectContent>
                  </Select>
 
@@ -305,6 +401,26 @@ export default function App() {
                      <SelectItem value="All">Любой формат</SelectItem>
                      <SelectItem value="Онлайн">Онлайн</SelectItem>
                      <SelectItem value="Оффлайн">Оффлайн</SelectItem>
+                   </SelectContent>
+                 </Select>
+
+                 <div className="h-8 w-px bg-gray-200 hidden md:block mx-2"></div>
+
+                 <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as any)}>
+                   <SelectTrigger className="w-[180px] rounded-xl border-transparent bg-gray-50 hover:bg-gray-100 h-11">
+                     <div className="flex items-center gap-2 truncate">
+                        <ArrowUpDown className="w-4 h-4 text-gray-500" />
+                        <span className="truncate">
+                          {sortOrder === 'date_asc' && 'Сначала новые'}
+                          {sortOrder === 'date_desc' && 'Сначала старые'}
+                          {sortOrder === 'title_asc' && 'По алфавиту'}
+                        </span>
+                     </div>
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="date_asc">Сначала новые</SelectItem>
+                     <SelectItem value="date_desc">Сначала старые</SelectItem>
+                     <SelectItem value="title_asc">По алфавиту</SelectItem>
                    </SelectContent>
                  </Select>
                </div>
@@ -327,7 +443,7 @@ export default function App() {
               ) : (
                 <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
                    <div className="text-gray-400 mb-2">Ничего не найдено</div>
-                   <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All');}} className="text-blue-600">
+                   <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setSortOrder('date_asc');}} className="text-blue-600">
                      Сбросить фильтры
                    </Button>
                 </div>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Sparkles, Bot, ArrowRight } from 'lucide-react';
 import { Button } from '../ui/button';
+import { ImageWithFallback } from '../figma/ImageWithFallback';
+import catImage from 'figma:asset/be6c08208236b0d0ab12c3b7522e41ad4d459818.png';
 
 interface FooterDogProps {
   onSubscribe?: (email: string) => void;
@@ -9,79 +11,100 @@ interface FooterDogProps {
 export function FooterDog({ onSubscribe }: FooterDogProps) {
   return (
     <div className="mt-auto bg-white border-t border-gray-100 relative overflow-hidden">
-      <div className="container mx-auto px-4 py-16 relative z-10">
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+      <div className="w-full bg-black text-white py-20">
+        <div className="container mx-auto px-4 relative z-10">
           
-          {/* Text Content */}
-          <div className="space-y-8 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 text-blue-600 text-xs font-bold tracking-wider uppercase ring-1 ring-blue-100">
-              <Sparkles className="w-3 h-3" />
-              Sber AI Assistant
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 leading-[1.1] tracking-tight">
-              Не пропусти важное <br/> с умным помощником
-            </h2>
-            <p className="text-lg text-slate-500 leading-relaxed">
-              Наш ИИ анализирует ваши интересы и роль в компании, чтобы предложить именно те мероприятия, которые помогут вам в карьере.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-3 max-w-md">
-              <Button className="h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap rounded-xl shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
-                Подключить AI <Bot className="ml-2 w-5 h-5" />
-              </Button>
-            </div>
-            <p className="text-xs text-slate-400 font-medium">
-              Используем OpenRouter API для персонализации.
-            </p>
+          {/* Main CTA */}
+          <div className="text-center mb-24">
+             <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tight">
+               Присоединяйся<br/>к команде Сбера
+             </h2>
+             <Button className="rounded-full border border-white/30 text-white bg-transparent hover:bg-white hover:text-black px-10 h-14 text-lg transition-all">
+               Хочу в команду
+             </Button>
           </div>
 
-          {/* Dog Image Section */}
-          <div className="flex items-center justify-center relative">
-            {/* Decorative blobs */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-br from-blue-100/50 to-purple-100/50 rounded-full blur-3xl opacity-70"></div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
             
-            {/* The Dog */}
-            <div className="relative z-10 w-full max-w-md aspect-square flex items-center justify-center">
-               <img 
-                 src="https://images.unsplash.com/photo-1552327830-b2cf19940b50?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjdXRlJTIwZG9nJTIwM2QlMjBpbGx1c3RyYXRpb24lMjB3aGl0ZSUyMGJhY2tncm91bmR8ZW58MXx8fHwxNzYzNTgxMjUxfDA&ixlib=rb-4.1.0&q=80&w=1080" 
-                 alt="3D Cute Dog" 
-                 className="object-contain w-full h-full drop-shadow-2xl transform hover:scale-105 transition-transform duration-700 ease-out"
-               />
+            {/* Left: Logo & Legal */}
+            <div className="md:col-span-3 space-y-8">
+               <div className="flex flex-col items-start">
+                  <span className="text-xs text-gray-500 font-medium mb-2">Powered by</span>
+                  <div className="flex items-center gap-2 mb-1">
+                     <span className="text-blue-500 font-bold text-3xl tracking-wide uppercase" style={{ fontFamily: 'Arial, sans-serif' }}>ПУЛЬС</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <div className="w-5 h-5 rounded-full border border-blue-500 flex items-center justify-center">
+                        <div className="w-3 h-3 bg-gradient-to-tr from-green-400 to-blue-500 rounded-full"></div>
+                     </div>
+                     <span className="font-semibold tracking-widest text-sm">СБЕР</span>
+                  </div>
+               </div>
                
-               {/* Floating Card Element */}
-               <div className="absolute -bottom-6 -left-6 bg-white p-5 rounded-2xl shadow-xl shadow-blue-900/5 border border-white/50 backdrop-blur-sm max-w-[220px] hidden sm:block animate-bounce duration-[3000ms]">
-                 <div className="flex items-center gap-3 mb-2">
-                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                   <span className="text-xs font-semibold text-blue-500 uppercase tracking-wide">Новое событие</span>
-                 </div>
-                 <p className="text-sm font-bold text-slate-900">Хакатон завтра!</p>
-                 <p className="text-xs text-slate-400 mt-1">Вы записаны</p>
+               <div className="text-[10px] text-gray-600 leading-relaxed max-w-[240px] pt-12">
+                  © 1997—2025 ПАО Сбербанк. Генеральная лицензия на осуществление банковских операций от 11 августа 2015 года. Регистрационный номер — 1481<br/>
+                  <a href="https://sberbank.ru" className="underline hover:text-white transition-colors mt-1 inline-block">www.sberbank.ru</a>
                </div>
             </div>
-          </div>
 
+            {/* Middle: Links */}
+            <div className="md:col-span-5 grid grid-cols-2 gap-8 pt-2">
+               <div className="space-y-4">
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">IT в Сбере</a>
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">Команды</a>
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">Локации</a>
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">События</a>
+               </div>
+               <div className="space-y-4">
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">AI в Сбере</a>
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">Почему мы</a>
+                  <a href="#" className="block text-gray-400 hover:text-white transition-colors font-medium">Все вакансии</a>
+               </div>
+            </div>
+
+            {/* Right: Cat */}
+            <div className="md:col-span-4 relative flex flex-col items-end justify-between h-full">
+                {/* Cat Image */}
+                <div className="relative w-full max-w-[300px] aspect-square mb-8">
+                   <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+                     {/* Grass */}
+                     <path d="M10 180 Q 30 150 50 180 T 90 180 T 130 180 T 170 180 T 210 180 V 200 H 0 V 180 Z" fill="#1E3A8A" />
+                     <path d="M0 185 Q 20 160 40 185 T 80 185 T 120 185 T 160 185 T 200 185 V 200 H 0 Z" fill="#2563EB" opacity="0.7" />
+                     
+                     {/* Dog Body */}
+                     <path d="M60 130 Q 60 100 90 100 H 130 Q 160 100 160 130 V 170 H 140 V 140 H 130 V 170 H 90 V 140 H 80 V 170 H 60 Z" fill="white" />
+                     
+                     {/* Dog Head */}
+                     <circle cx="70" cy="90" r="35" fill="white" />
+                     
+                     {/* Ears */}
+                     <path d="M40 70 L 50 50 L 70 60 Z" fill="#3B82F6" />
+                     <path d="M100 70 L 90 50 L 70 60 Z" fill="#3B82F6" />
+                     
+                     {/* Eyes */}
+                     <circle cx="60" cy="85" r="4" fill="#1E3A8A" />
+                     <circle cx="80" cy="85" r="4" fill="#1E3A8A" />
+                     
+                     {/* Nose */}
+                     <circle cx="70" cy="95" r="5" fill="#1E3A8A" />
+                     
+                     {/* Collar */}
+                     <rect x="85" y="100" width="5" height="30" fill="#2563EB" transform="rotate(90 87.5 115)" />
+                     
+                     {/* Tail */}
+                     <path d="M160 110 Q 180 100 180 80" stroke="white" strokeWidth="8" fill="none" strokeLinecap="round" />
+                   </svg>
+                </div>
+                
+                <div className="text-right text-xs text-gray-600 space-y-2 w-full">
+                   <a href="#" className="block hover:text-white transition-colors">Юридические документы</a>
+                   <a href="#" className="block hover:text-white transition-colors">Политика конфиденциальности</a>
+                   <a href="#" className="block hover:text-white transition-colors">Политика обработки данных</a>
+                </div>
+            </div>
+
+          </div>
         </div>
-
-        {/* Bottom Links */}
-        <div className="mt-20 pt-8 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-slate-500">
-          <div className="flex items-center gap-3 font-bold text-slate-900">
-             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-4 h-4">
-                  <path d="M5 12l5 5l10 -10" />
-                </svg>
-             </div>
-             SberEvents
-          </div>
-          <div className="flex gap-8 font-medium">
-            <a href="#" className="hover:text-blue-600 transition-colors">Календарь</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Профиль</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Поддержка</a>
-            <a href="#" className="hover:text-blue-600 transition-colors">Правила</a>
-          </div>
-          <p className="text-slate-400 font-normal">© 2025 Sberbank Tech</p>
-        </div>
-
       </div>
     </div>
   );

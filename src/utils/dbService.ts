@@ -31,12 +31,9 @@ async function fetchAPI(endpoint: string, method: string = 'GET', body?: any) {
 
 // Helper to seed events if empty
 export async function seedEvents() {
-  const response = await fetchAPI('/events');
-  const events = response?.data;
-  
-  if (!events || (Array.isArray(events) && events.length === 0)) {
-     await fetchAPI('/events', 'POST', MOCK_EVENTS);
-  }
+  // Force update events to ensure they match the latest MOCK_EVENTS
+  // This is important because we changed the dataset requirements
+  await fetchAPI('/events', 'POST', MOCK_EVENTS);
 }
 
 export async function fetchEvents(): Promise<Event[]> {

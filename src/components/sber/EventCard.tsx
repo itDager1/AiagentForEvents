@@ -14,6 +14,7 @@ interface EventCardProps {
 
 export function EventCard({ event, isRegistered, onToggleRegister }: EventCardProps) {
   return (
+    !['Волонтерство', 'Спорт', 'Корпоратив'].includes(event.category as any) ? (
     <Card className="group overflow-hidden border-transparent shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col h-full rounded-3xl bg-white ring-1 ring-slate-100">
       <div className="relative h-52 overflow-hidden m-2 rounded-2xl">
         <ImageWithFallback 
@@ -93,5 +94,6 @@ export function EventCard({ event, isRegistered, onToggleRegister }: EventCardPr
         </Button>
       </CardFooter>
     </Card>
+    ) : null
   );
 }

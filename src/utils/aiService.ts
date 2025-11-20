@@ -17,17 +17,19 @@ export async function getAIRecommendations(user: User, events: Event[], _apiKey?
     }));
 
     const currentDate = new Date();
-    const threeMonthsLater = new Date(currentDate);
-    threeMonthsLater.setMonth(currentDate.getMonth() + 3);
+    const sixMonthsLater = new Date(currentDate);
+    sixMonthsLater.setMonth(currentDate.getMonth() + 6);
     
     const prompt = `
       Context:
       - Current Date: ${currentDate.toISOString().split('T')[0]}
-      - Target Date Range: Next 3 months (until ${threeMonthsLater.toISOString().split('T')[0]})
+      - Target Date Range: Next 6 months (until ${sixMonthsLater.toISOString().split('T')[0]})
       - Target Location: Russia (or Online)
+      - Target Topic: IT and Tech events
 
       User Profile:
       - Role: ${user.role}
+      - Schedule: ${user.schedule || 'Standard'}
       - Interests: ${user.interests.length > 0 ? user.interests.join(', ') : 'General'}
       
       Available Events:
@@ -36,7 +38,9 @@ export async function getAIRecommendations(user: User, events: Event[], _apiKey?
       Task: 
       1. Filter for events happening within the Target Date Range (IMPORTANT).
       2. Filter for events in Russia or Online.
-      3. From the filtered list, select the top 3 events that best match the user's role and interests.
+      3. PRIORITIZE IT and Tech related events.
+      4. Consider the user's work schedule constraints (e.g., 5/2 prefers weekends/evenings, Remote allows more flexibility).
+      5. From the filtered list, select the top 3 events that best match the user's role, schedule, and interests.
       
       Return a JSON array of strings containing ONLY the IDs of the selected events.
       Example output: ["1", "5", "9"]

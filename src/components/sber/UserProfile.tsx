@@ -1,25 +1,112 @@
 import React from 'react';
 import { User, Event, WorkSchedule } from '../../data/mock';
 import { EventCard } from './EventCard';
-import { Calendar as CalendarIcon, User as UserIcon, Briefcase, Mail, Hash, ArrowLeft, Sparkles, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, User as UserIcon, Briefcase, Mail, Hash, ArrowLeft, Sparkles, Clock, ChevronLeft, ChevronRight, MapPin, Link as LinkIcon } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 
 interface UserProfileProps {
   user: User;
   myEvents: Event[];
   onBack: () => void;
-  onUpdateUser?: (user: User) => void;
+  onUpdateUser?: (updatedUser: User) => void;
 }
 
 export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfileProps) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
   const handleScheduleChange = (value: WorkSchedule) => {
     if (onUpdateUser) {
       onUpdateUser({ ...user, schedule: value });
     }
+  };
+
+  // Calendar Logic
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = new Date(year, month, 1).getDay();
+    // Convert Sunday (0) to 6, Monday (1) to 0, etc. for Monday start
+    return day === 0 ? 6 : day - 1;
+  };
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const days = [];
+    
+    // Empty cells for previous month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-32 bg-slate-50/50 border border-slate-100/50"></div>);
+    }
+
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+      const dateString = currentDayDate.toISOString().split('T')[0];
+      
+      const dayEvents = myEvents.filter(event => {
+        const eventDate = new Date(event.date);
+        return eventDate.getDate() === day && 
+               eventDate.getMonth() === currentDate.getMonth() && 
+               eventDate.getFullYear() === currentDate.getFullYear();
+      });
+
+      days.push(
+        <div key={day} className="h-32 bg-white border border-slate-100 p-2 relative hover:bg-slate-50 transition-colors group overflow-hidden">
+          <span className={`text-sm font-medium ${
+            dayEvents.length > 0 ? 'text-slate-900' : 'text-slate-400'
+          } ${
+            new Date().toDateString() === currentDayDate.toDateString() 
+              ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full' 
+              : ''
+          }`}>
+            {day}
+          </span>
+          
+          <div className="mt-2 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] no-scrollbar">
+            {dayEvents.map(event => (
+              <div 
+                key={event.id}
+                onClick={() => setSelectedEvent(event)}
+                className="text-[10px] font-medium bg-blue-50 text-blue-700 p-1.5 rounded-md border border-blue-100 truncate cursor-pointer hover:bg-blue-100 transition-colors"
+                title={event.title}
+              >
+                {event.title}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return days;
   };
 
   return (
@@ -37,7 +124,7 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: Profile Info */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Profile Card */}
+          {/* Profile Card - keeping existing code */}
           <Card className="overflow-hidden border-transparent shadow-sm rounded-3xl">
             {/* Header with gradient */}
             <div className="h-32 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 relative overflow-hidden">
@@ -88,8 +175,11 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
                       <SelectContent>
                         <SelectItem value="5/2">5/2 (Офис)</SelectItem>
                         <SelectItem value="2/2">2/2 (Сменный)</SelectItem>
+                        <SelectItem value="4/3">4/3 (Четырехдневка)</SelectItem>
                         <SelectItem value="Гибкий">Гибкий график</SelectItem>
                         <SelectItem value="Удаленка">Удаленная работа</SelectItem>
+                        <SelectItem value="Неполный день">Неполный день</SelectItem>
+                        <SelectItem value="Проектная">Проектная работа</SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
@@ -117,101 +207,149 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
               </div>
             </CardContent>
           </Card>
-
-          {/* Stats Card */}
-          <Card className="border-transparent shadow-sm bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-600/20">
-                  <CalendarIcon className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-slate-900 mb-1">Мой календарь</h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    У вас запланировано <span className="font-bold text-blue-600">{myEvents.length}</span> {myEvents.length === 1 ? 'мероприятие' : 'мероприятий'} на этот месяц.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Right: My Events Calendar List */}
+        {/* Right: Calendar Grid */}
         <div className="lg:col-span-2">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+          <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
                 <CalendarIcon className="w-5 h-5 text-white" />
               </div>
-              Мои мероприятия
+              <span className="capitalize">
+                {currentDate.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}
+              </span>
             </h2>
-            <Badge variant="outline" className="border-blue-200 text-blue-600 bg-blue-50 px-4 py-2 rounded-full font-medium">
-              {myEvents.length} {myEvents.length === 1 ? 'событие' : 'событий'}
-            </Badge>
-          </div>
-
-          {myEvents.length > 0 ? (
-            <div className="space-y-6">
-              {/* Calendar List View */}
-              <div className="grid gap-4">
-                {myEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(event => (
-                   <div 
-                     key={event.id} 
-                     className="group flex flex-col sm:flex-row gap-4 p-4 bg-white rounded-2xl shadow-sm border border-transparent hover:shadow-lg hover:shadow-blue-900/5 transition-all duration-300 overflow-hidden"
-                   >
-                      <div className="w-full sm:w-56 h-36 rounded-xl overflow-hidden shrink-0 relative">
-                        <ImageWithFallback 
-                          src={event.image} 
-                          alt={event.title} 
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
-                        <Badge className="absolute top-2 left-2 bg-white/95 text-slate-900 hover:bg-white backdrop-blur-md shadow-sm border-none">
-                          {event.category}
-                        </Badge>
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                         <div>
-                           <div className="flex items-center gap-2 text-xs text-blue-600 font-bold mb-2 uppercase tracking-wider">
-                              <CalendarIcon className="w-3.5 h-3.5" />
-                              {new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })} • {event.format}
-                           </div>
-                           <h3 className="font-bold text-xl text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">{event.title}</h3>
-                           <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">{event.description}</p>
-                         </div>
-                         <div className="flex items-center gap-2 mt-4 flex-wrap">
-                            {event.tags.map(tag => (
-                               <span key={tag} className="text-[11px] font-medium bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-wide">
-                                 #{tag}
-                               </span>
-                            ))}
-                         </div>
-                      </div>
-                   </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CalendarIcon className="w-10 h-10 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Календарь пуст</h3>
-              <p className="text-slate-500 max-w-sm mx-auto mb-6 leading-relaxed">
-                Запишитесь на мероприятия в каталоге, чтобы они появились здесь.
-              </p>
-              <Button 
-                onClick={onBack} 
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 h-12 font-medium shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all"
-              >
-                Перейти в каталог
-                <Sparkles className="ml-2 w-4 h-4" />
+            
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={prevMonth} className="h-9 w-9 rounded-full hover:bg-blue-50 hover:text-blue-600">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={nextMonth} className="h-9 w-9 rounded-full hover:bg-blue-50 hover:text-blue-600">
+                <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
-          )}
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Week days header */}
+            <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
+              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => (
+                <div key={day} className="py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 bg-slate-100 gap-px border-b border-slate-100">
+              {renderCalendar()}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="mt-4 flex items-center gap-4 text-sm text-slate-500 px-2">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+              <span>Текущая дата</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-50 border border-blue-200 rounded"></div>
+              <span>Событие</span>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Event Details Modal */}
+      <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+            {selectedEvent && (
+                <>
+                    <div className="relative h-48 w-full">
+                        <ImageWithFallback 
+                            src={selectedEvent.image} 
+                            alt={selectedEvent.title} 
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
+                            <Badge className="bg-white text-slate-900 backdrop-blur-sm shadow-sm border-none mb-1">
+                                {selectedEvent.category}
+                            </Badge>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full backdrop-blur-md"
+                            onClick={() => setSelectedEvent(null)}
+                        >
+                            <span className="sr-only">Close</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </Button>
+                    </div>
+                    
+                    <div className="p-6 bg-white">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-bold text-slate-900 leading-tight mb-2">
+                                {selectedEvent.title}
+                            </DialogTitle>
+                            <DialogDescription className="text-slate-500 flex items-center gap-2">
+                                <Badge variant="outline" className="font-normal">
+                                    {selectedEvent.format}
+                                </Badge>
+                            </DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="space-y-4 mt-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
+                                    <CalendarIcon className="w-4 h-4 text-blue-500" />
+                                    <div>
+                                        <p className="text-xs text-slate-400">Дата</p>
+                                        <p className="font-medium">{new Date(selectedEvent.date).toLocaleDateString('ru-RU')}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
+                                    <Clock className="w-4 h-4 text-blue-500" />
+                                    <div>
+                                        <p className="text-xs text-slate-400">Время</p>
+                                        <p className="font-medium">{new Date(selectedEvent.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
+                                <MapPin className="w-4 h-4 text-blue-500 mt-0.5" />
+                                <div>
+                                    <p className="text-xs text-slate-400">Место проведения</p>
+                                    <p className="font-medium">{selectedEvent.location}</p>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <p className="text-sm text-slate-600 leading-relaxed">
+                                    {selectedEvent.description}
+                                </p>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 pt-2">
+                                {selectedEvent.tags.map(tag => (
+                                    <span key={tag} className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-md">#{tag}</span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end">
+                            <Button onClick={() => setSelectedEvent(null)} className="bg-slate-100 text-slate-900 hover:bg-slate-200">
+                                Закрыть
+                            </Button>
+                        </div>
+                    </div>
+                </>
+            )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
