@@ -1,37 +1,74 @@
-import React from 'react';
-import { User, Event, WorkSchedule } from '../../data/mock';
-import { EventCard } from './EventCard';
-import { Calendar as CalendarIcon, User as UserIcon, Briefcase, Mail, Hash, ArrowLeft, Sparkles, Clock, ChevronLeft, ChevronRight, MapPin, Link as LinkIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Event, WorkSchedule, EventRegistration } from '../../data/mock';
+import { Calendar as CalendarIcon, User as UserIcon, Briefcase, Mail, Plus, X, ChevronLeft, ChevronRight, Clock as ClockIcon } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
+import { Card, CardContent } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../ui/dialog";
+import { EventDetailsModal } from './EventDetailsModal';
+import { ArrowLeft, Clock } from 'lucide-react';
 
 interface UserProfileProps {
   user: User;
   myEvents: Event[];
+  userRegistrations?: EventRegistration[];
   onBack: () => void;
   onUpdateUser?: (updatedUser: User) => void;
 }
 
-export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfileProps) {
+export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdateUser }: UserProfileProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [newInterest, setNewInterest] = useState('');
+  const [isAddingInterest, setIsAddingInterest] = useState(false);
+
+  // Auto-refresh registrations when component mounts to get latest status
+  useEffect(() => {
+    // Trigger a re-render by checking localStorage directly
+    const checkForUpdates = () => {
+      // This will cause the component to use the latest data passed from parent
+      // Parent component manages the data, we just display it
+    };
+    
+    checkForUpdates();
+  }, []);
 
   const handleScheduleChange = (value: WorkSchedule) => {
     if (onUpdateUser) {
       onUpdateUser({ ...user, schedule: value });
     }
   };
+
+  const handleAddInterest = () => {
+    if (!newInterest.trim() || !onUpdateUser) return;
+    if (user.interests.includes(newInterest.trim())) {
+        setNewInterest('');
+        setIsAddingInterest(false);
+        return;
+    }
+    
+    const updatedInterests = [...user.interests, newInterest.trim()];
+    onUpdateUser({ ...user, interests: updatedInterests });
+    setNewInterest('');
+    setIsAddingInterest(false);
+  };
+
+  const handleRemoveInterest = (interest: string) => {
+    if (!onUpdateUser) return;
+    const updatedInterests = user.interests.filter(i => i !== interest);
+    onUpdateUser({ ...user, interests: updatedInterests });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAddInterest();
+    } else if (e.key === 'Escape') {
+      setIsAddingInterest(false);
+      setNewInterest('');
+    }
+  };
+
 
   // Calendar Logic
   const getDaysInMonth = (date: Date) => {
@@ -69,7 +106,6 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-      const dateString = currentDayDate.toISOString().split('T')[0];
       
       const dayEvents = myEvents.filter(event => {
         const eventDate = new Date(event.date);
@@ -91,16 +127,67 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
           </span>
           
           <div className="mt-2 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] no-scrollbar">
-            {dayEvents.map(event => (
-              <div 
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                className="text-[10px] font-medium bg-blue-50 text-blue-700 p-1.5 rounded-md border border-blue-100 truncate cursor-pointer hover:bg-blue-100 transition-colors"
-                title={event.title}
-              >
-                {event.title}
-              </div>
-            ))}
+            {dayEvents.map(event => {
+              // Get registration status for this event
+              const registration = userRegistrations?.find(r => r.eventId === event.id);
+              const status = registration ? registration.status : 'approved'; // Default to approved for backward compatibility
+              
+              // Define styles based on status
+              let bgColor = 'bg-blue-50';
+              let textColor = 'text-blue-700';
+              let borderColor = 'border-blue-100';
+              let hoverColor = 'hover:bg-blue-100';
+              let statusText = '';
+              
+              if (status === 'pending') {
+                bgColor = 'bg-amber-50';
+                textColor = 'text-amber-700';
+                borderColor = 'border-amber-200';
+                hoverColor = 'hover:bg-amber-100';
+                statusText = '⏳';
+              } else if (status === 'approved') {
+                bgColor = 'bg-green-50';
+                textColor = 'text-green-700';
+                borderColor = 'border-green-200';
+                hoverColor = 'hover:bg-green-100';
+                statusText = '✓';
+              } else if (status === 'rejected') {
+                bgColor = 'bg-red-50';
+                textColor = 'text-red-700';
+                borderColor = 'border-red-200';
+                hoverColor = 'hover:bg-red-100';
+                statusText = '✕';
+              }
+              
+              return (
+                <div 
+                  key={event.id}
+                  onClick={() => setSelectedEvent(event)}
+                  className={`group/event relative text-[10px] font-medium ${bgColor} ${textColor} p-1.5 rounded-md border ${borderColor} cursor-pointer ${hoverColor} transition-colors pr-6`}
+                  title={`${event.title} - ${status === 'pending' ? 'Ожидает одобрения' : status === 'approved' ? 'Одобрено' : 'Отклонено'}`}
+                >
+                  <div className="truncate flex items-center gap-1">
+                    <span className="text-[8px]">{statusText}</span>
+                    <span>{event.title}</span>
+                  </div>
+                  {onUpdateUser && status !== 'rejected' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updatedIds = user.myEventIds.filter(id => id !== event.id);
+                        onUpdateUser({ ...user, myEventIds: updatedIds });
+                      }}
+                      className={`absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/event:opacity-100 p-0.5 rounded-full transition-all ${
+                        status === 'pending' ? 'hover:bg-amber-200' : 'hover:bg-green-200'
+                      }`}
+                      title="Отписаться"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -164,7 +251,7 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
                 {/* Work Schedule */}
                 <div className="pt-4 border-t border-slate-100">
                   <div className="flex items-center gap-2 mb-3">
-                    <Clock className="w-4 h-4 text-blue-600" />
+                    <ClockIcon className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium text-slate-900">График работы</span>
                   </div>
                   {onUpdateUser ? (
@@ -191,16 +278,57 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
 
                 {/* Interests */}
                 <div className="pt-4 border-t border-slate-100">
-                  <p className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Интересы</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-bold uppercase text-slate-400 tracking-wider">Интересы</p>
+                    {onUpdateUser && !isAddingInterest && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setIsAddingInterest(true)}
+                            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Добавить
+                        </Button>
+                    )}
+                  </div>
+                  
                   <div className="flex flex-wrap gap-2">
                     {user.interests.length > 0 ? (
                       user.interests.map(tag => (
-                        <Badge key={tag} className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-none font-medium">
+                        <Badge key={tag} className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-none font-medium pr-1.5 gap-1 group/badge">
                           {tag}
+                          {onUpdateUser && (
+                              <button 
+                                onClick={() => handleRemoveInterest(tag)}
+                                className="w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center transition-colors opacity-60 group-hover/badge:opacity-100"
+                              >
+                                  <X className="w-2.5 h-2.5" />
+                              </button>
+                          )}
                         </Badge>
                       ))
                     ) : (
-                      <p className="text-sm text-slate-400 italic">Интересы не указаны</p>
+                      !isAddingInterest && <p className="text-sm text-slate-400 italic">Интересы не указаны</p>
+                    )}
+                    
+                    {isAddingInterest && (
+                        <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in zoom-in-95 duration-200">
+                            <Input
+                                value={newInterest}
+                                onChange={(e) => setNewInterest(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Например: Java"
+                                className="h-7 text-sm w-32"
+                                autoFocus
+                            />
+                            <Button size="sm" onClick={handleAddInterest} className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-white">
+                                <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsAddingInterest(false)} className="h-7 px-2">
+                                <X className="w-3 h-3" />
+                            </Button>
+                        </div>
                     )}
                   </div>
                 </div>
@@ -249,107 +377,33 @@ export function UserProfile({ user, myEvents, onBack, onUpdateUser }: UserProfil
           </div>
 
           {/* Legend */}
-          <div className="mt-4 flex items-center gap-4 text-sm text-slate-500 px-2">
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-500 px-2">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
               <span>Текущая дата</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-50 border border-blue-200 rounded"></div>
-              <span>Событие</span>
+              <div className="w-3 h-3 bg-amber-50 border border-amber-200 rounded"></div>
+              <span>⏳ Ожидает одобрения</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-50 border border-green-200 rounded"></div>
+              <span>✓ Одобрено</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-50 border border-red-200 rounded"></div>
+              <span>✕ Отклонено</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Event Details Modal */}
-      <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
-            {selectedEvent && (
-                <>
-                    <div className="relative h-48 w-full">
-                        <ImageWithFallback 
-                            src={selectedEvent.image} 
-                            alt={selectedEvent.title} 
-                            className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                            <Badge className="bg-white text-slate-900 backdrop-blur-sm shadow-sm border-none mb-1">
-                                {selectedEvent.category}
-                            </Badge>
-                        </div>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white rounded-full backdrop-blur-md"
-                            onClick={() => setSelectedEvent(null)}
-                        >
-                            <span className="sr-only">Close</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                        </Button>
-                    </div>
-                    
-                    <div className="p-6 bg-white">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold text-slate-900 leading-tight mb-2">
-                                {selectedEvent.title}
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-500 flex items-center gap-2">
-                                <Badge variant="outline" className="font-normal">
-                                    {selectedEvent.format}
-                                </Badge>
-                            </DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="space-y-4 mt-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
-                                    <CalendarIcon className="w-4 h-4 text-blue-500" />
-                                    <div>
-                                        <p className="text-xs text-slate-400">Дата</p>
-                                        <p className="font-medium">{new Date(selectedEvent.date).toLocaleDateString('ru-RU')}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
-                                    <Clock className="w-4 h-4 text-blue-500" />
-                                    <div>
-                                        <p className="text-xs text-slate-400">Время</p>
-                                        <p className="font-medium">{new Date(selectedEvent.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="flex items-start gap-3 text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">
-                                <MapPin className="w-4 h-4 text-blue-500 mt-0.5" />
-                                <div>
-                                    <p className="text-xs text-slate-400">Место проведения</p>
-                                    <p className="font-medium">{selectedEvent.location}</p>
-                                </div>
-                            </div>
-
-                            <div className="pt-2">
-                                <p className="text-sm text-slate-600 leading-relaxed">
-                                    {selectedEvent.description}
-                                </p>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-2 pt-2">
-                                {selectedEvent.tags.map(tag => (
-                                    <span key={tag} className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-md">#{tag}</span>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="mt-8 flex justify-end">
-                            <Button onClick={() => setSelectedEvent(null)} className="bg-slate-100 text-slate-900 hover:bg-slate-200">
-                                Закрыть
-                            </Button>
-                        </div>
-                    </div>
-                </>
-            )}
-        </DialogContent>
-      </Dialog>
+      <EventDetailsModal 
+        event={selectedEvent} 
+        isOpen={!!selectedEvent} 
+        onClose={() => setSelectedEvent(null)} 
+      />
     </div>
   );
 }

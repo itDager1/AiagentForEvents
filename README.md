@@ -1,7 +1,7 @@
 
-  # сайт ме
+  # exact direction AI-Agent
 
-  This is a code bundle for сайт ме. The original project is available at https://www.figma.com/design/UPgSZLmGZcamjFbKUQCu4N/%D1%81%D0%B0%D0%B9%D1%82-%D0%BC%D0%B5.
+  This is a code bundle for exact direction AI-Agent. The original project is available at https://www.figma.com/design/UPgSZLmGZcamjFbKUQCu4N/exact-direction-AI-Agent.
 
   ## Running the code
 

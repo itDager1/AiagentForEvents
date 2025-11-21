@@ -11,21 +11,44 @@ import { supabase } from '../../utils/supabaseClient';
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { createUserProfile } from '../../utils/dbService';
 import { toast } from 'sonner@2.0.3';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, Shield } from 'lucide-react';
 
 interface AuthProps {
   isOpen: boolean;
   onClose: () => void;
   onMockLogin?: (name: string, role: Role, email: string) => void;
+  onAdminLogin?: (name: string, role: Role, email: string) => void;
 }
 
-export function Auth({ isOpen, onClose, onMockLogin }: AuthProps) {
+export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('Разработчик');
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPasswordInput, setShowAdminPasswordInput] = useState(false);
+
+  const handleAdminLogin = () => {
+    if (!adminPassword.trim()) {
+      toast.error('Введите пароль администратора!');
+      return;
+    }
+    
+    if (adminPassword === '123456') {
+      if (onAdminLogin) {
+        onAdminLogin('Администратор', 'Менеджер', 'admin@sberbank.ru');
+        toast.success('Вход как Администратор выполнен!');
+        onClose();
+        setAdminPassword('');
+        setShowAdminPasswordInput(false);
+      }
+    } else {
+      toast.error('Неверный пароль администратора!');
+      setAdminPassword('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +148,14 @@ export function Auth({ isOpen, onClose, onMockLogin }: AuthProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        // Reset admin password fields when closing
+        setShowAdminPasswordInput(false);
+        setAdminPassword('');
+        onClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-md p-0 border-none bg-transparent shadow-none">
         <DialogTitle className="sr-only">Вход в систему</DialogTitle>
         <DialogDescription className="sr-only">
@@ -220,6 +250,71 @@ export function Auth({ isOpen, onClose, onMockLogin }: AuthProps) {
                   {loading ? 'Загрузка...' : (isRegister ? 'Создать аккаунт' : 'Войти')}
                 </Button>
               </form>
+              
+              {/* Admin Quick Login */}
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <div className="text-center text-xs text-gray-500 mb-3">
+                  Быстрый вход для тестирования
+                </div>
+                {showAdminPasswordInput ? (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="adminPassword">Пароль администратора</Label>
+                      <Input 
+                        id="adminPassword" 
+                        type="password"
+                        name="adminPassword"
+                        placeholder="Введите пароль"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAdminLogin();
+                          } else if (e.key === 'Escape') {
+                            setShowAdminPasswordInput(false);
+                            setAdminPassword('');
+                          }
+                        }}
+                        autoFocus
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={handleAdminLogin}
+                        className="flex-1 h-11 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800 hover:border-purple-300 rounded-xl transition-all"
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        Войти
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowAdminPasswordInput(false);
+                          setAdminPassword('');
+                        }}
+                        className="px-4 h-11 rounded-xl"
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAdminPasswordInput(true)}
+                    className="w-full h-11 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800 hover:border-purple-300 rounded-xl transition-all"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Войти как Администратор
+                  </Button>
+                )}
+              </div>
             </Tabs>
           </CardContent>
           <CardFooter className="text-center text-xs text-slate-400 justify-center pb-6">

@@ -10,12 +10,16 @@ interface EventCardProps {
   event: Event;
   isRegistered?: boolean;
   onToggleRegister: (id: string) => void;
+  onClick?: () => void;
 }
 
-export function EventCard({ event, isRegistered, onToggleRegister }: EventCardProps) {
+export function EventCard({ event, isRegistered, onToggleRegister, onClick }: EventCardProps) {
   return (
     !['Волонтерство', 'Спорт', 'Корпоратив'].includes(event.category as any) ? (
-    <Card className="group overflow-hidden border-transparent shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col h-full rounded-3xl bg-white ring-1 ring-slate-100">
+    <Card 
+      onClick={onClick}
+      className="group overflow-hidden border-transparent shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col h-full rounded-3xl bg-white ring-1 ring-slate-100 cursor-pointer"
+    >
       <div className="relative h-52 overflow-hidden m-2 rounded-2xl">
         <ImageWithFallback 
           src={event.image} 
@@ -38,7 +42,7 @@ export function EventCard({ event, isRegistered, onToggleRegister }: EventCardPr
         <div className="absolute bottom-3 left-3 right-3 text-white flex items-center justify-between text-xs font-medium">
            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
              <Calendar className="w-3.5 h-3.5" />
-             {new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+             {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
            </div>
            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
              <Clock className="w-3.5 h-3.5" />
@@ -78,7 +82,10 @@ export function EventCard({ event, isRegistered, onToggleRegister }: EventCardPr
               ? 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300' 
               : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40'
           }`}
-          onClick={() => onToggleRegister(event.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleRegister(event.id);
+          }}
         >
           {isRegistered ? (
             <>

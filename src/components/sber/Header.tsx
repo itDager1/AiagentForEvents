@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Search, User as UserIcon, Menu, LogOut, LogIn } from 'lucide-react';
+import { Bell, Calendar, User as UserIcon, Menu, LogOut, LogIn, Shield } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -13,6 +13,8 @@ import {
 } from "../ui/dropdown-menu";
 import { User } from '../../data/mock';
 import compassLogo from 'figma:asset/4d5fe6b6dc3105a55dec739d26b364ba01b8168a.png';
+import { ApiKeyStatusBadge } from './ApiKeyStatusBadge';
+import { AIBadge } from './AIBadge';
 
 interface HeaderProps {
   user: User | null;
@@ -20,9 +22,11 @@ interface HeaderProps {
   onProfileClick: () => void;
   onLoginClick: () => void;
   onEventsClick: () => void;
+  onCalendarClick?: () => void;
+  onAdminClick?: () => void;
 }
 
-export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsClick }: HeaderProps) {
+export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsClick, onCalendarClick, onAdminClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 border-b border-blue-100/50 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
@@ -37,25 +41,27 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
           </span>
         </div>
 
-        {/* Center: Navigation / Search (Desktop) */}
-        <div className="hidden md:flex items-center gap-8">
-           <nav className="flex gap-6 text-sm font-medium text-slate-600">
-             <a onClick={(e) => { e.preventDefault(); onEventsClick(); }} href="#" className="hover:text-blue-600 transition-colors cursor-pointer">События</a>
-             <a href="#" className="hover:text-blue-600 transition-colors">Календарь</a>
-             <a href="#" className="hover:text-blue-600 transition-colors">Сообщества</a>
-           </nav>
-           <div className="h-6 w-px bg-gray-200"></div>
-           <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input 
-              className="pl-10 bg-gray-100/50 border-transparent focus:bg-white focus:border-blue-200 rounded-xl transition-all h-10 text-sm"
-              placeholder="Поиск..."
-            />
+        {/* Center: Calendar Button */}
+        {user && onCalendarClick && (
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <Button 
+              onClick={onCalendarClick}
+              className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-600/30 px-6 transition-all hover:scale-105"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Календарь
+            </Button>
           </div>
-        </div>
+        )}
 
         {/* Right: User Actions */}
         <div className="flex items-center gap-3">
+          {/* AI Badge */}
+          <AIBadge />
+          
+          {/* API Key Status Badge (dev mode only) */}
+          <ApiKeyStatusBadge />
+          
           {user ? (
             <>
               <Button variant="ghost" size="icon" className="rounded-full text-gray-500 hover:text-blue-600 hover:bg-blue-50">
@@ -89,6 +95,15 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
                     <Bell className="mr-2 h-4 w-4" />
                     <span>Уведомления</span>
                   </DropdownMenuItem>
+                  {user.isAdmin && onAdminClick && (
+                    <>
+                      <DropdownMenuSeparator className="bg-blue-50" />
+                      <DropdownMenuItem onClick={onAdminClick} className="cursor-pointer hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-50 focus:text-purple-700">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Админ-панель</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-blue-50" />
                   <DropdownMenuItem onClick={onLogout} className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50">
                     <LogOut className="mr-2 h-4 w-4" />

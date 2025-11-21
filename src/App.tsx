@@ -4,25 +4,45 @@ import { Auth } from './components/sber/Auth';
 import { EventCard } from './components/sber/EventCard';
 import { FooterDog } from './components/sber/FooterDog';
 import { UserProfile } from './components/sber/UserProfile';
-import { MOCK_EVENTS, User, Event, EventCategory, Role } from './data/mock';
+import { EventDetailsModal } from './components/sber/EventDetailsModal';
+import { ApiKeySetupNotice } from './components/sber/ApiKeySetupNotice';
+import { AdminPanel } from './components/sber/AdminPanel';
+import { MOCK_EVENTS, User, Event, EventCategory, Role, EventRegistration } from './data/mock';
 import { getAIRecommendations } from './utils/aiService';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Input } from './components/ui/input';
-import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown } from 'lucide-react';
+import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown, Shield } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Toaster } from 'sonner@2.0.3';
 import { supabase } from './utils/supabaseClient';
-import { fetchEvents, seedEvents, toggleRegistration, getUserProfile, createUserProfile } from './utils/dbService';
+import { 
+  fetchEvents, 
+  seedEvents, 
+  getUserProfile, 
+  createUserProfile,
+  createRegistration,
+  getUserRegistrations,
+  getApprovedRegistrations
+} from './utils/dbService';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
+import { logApiKeyStatus, checkApiKeyStatus } from './utils/checkApiKey';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'catalog' | 'profile'>('catalog');
+  const [view, setView] = useState<'catalog' | 'profile' | 'admin'>('catalog');
   const [events, setEvents] = useState<Event[]>([]); // Start empty, fetch from DB
   const [loading, setLoading] = useState(true);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [userRegistrations, setUserRegistrations] = useState<EventRegistration[]>([]);
+
+  // API Key Status
+  const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean>(true);
+  const [isCheckingApiKey, setIsCheckingApiKey] = useState<boolean>(false);
+  
+  // Modal State
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   
   // Filters
   const [search, setSearch] = useState('');
@@ -37,25 +57,58 @@ export default function App() {
   // Auth & Data Fetching
   useEffect(() => {
     const init = async () => {
+      console.log('%c🧭 Exact Direction - Загрузка приложения...', 'color: #0066FF; font-weight: bold; font-size: 16px;');
+      console.log('');
+      
+      // Check API key status
+      if (process.env.NODE_ENV === 'development') {
+        logApiKeyStatus();
+      }
+      
+      const status = await checkApiKeyStatus();
+      setApiKeyConfigured(status.isConfigured);
+      
+      if (!status.isConfigured) {
+        console.log('%c⚠️ OpenRouter API не настроен', 'color: #F59E0B; font-weight: bold;');
+        console.log('%c   → Приложение будет работать с демо-данными', 'color: #6B7280;');
+        console.log('%c   → Для настройки см. SUPABASE_API_KEY_SETUP.md', 'color: #3B82F6;');
+        console.log('');
+      } else {
+        console.log('%c✅ OpenRouter API настроен', 'color: #10B981; font-weight: bold;');
+        console.log('');
+      }
+
       // 1. Seed events if needed
+      console.log('📊 Загрузка событий...');
       await seedEvents();
 
       // 2. Fetch events
       const fetchedEvents = await fetchEvents();
       setEvents(fetchedEvents);
+      console.log(`✅ Загружено ${fetchedEvents.length} событий`);
+      console.log('');
 
       // 3. Check current session
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const profile = await getUserProfile(session.user.id);
-          if (profile) setUser(profile);
+          if (profile) {
+            setUser(profile);
+            console.log(`👤 Пользователь: ${profile.name}`);
+            
+            // Load user registrations
+            const regs = await getUserRegistrations(profile.id);
+            setUserRegistrations(regs);
+          }
         }
       } catch (e) {
         // Ignore session fetch error
       }
       
       setLoading(false);
+      console.log('%c🎉 Приложение готово!', 'color: #10B981; font-weight: bold; font-size: 14px;');
+      console.log('');
     };
     
     init();
@@ -75,6 +128,19 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+  
+  const handleRecheckApiKey = async () => {
+    setIsCheckingApiKey(true);
+    const status = await checkApiKeyStatus();
+    setApiKeyConfigured(status.isConfigured);
+    setIsCheckingApiKey(false);
+    
+    if (status.isConfigured) {
+      toast.success('✅ API ключ настроен корректно!');
+    } else {
+      toast.error('⚠️ API ключ не настроен');
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -94,10 +160,42 @@ export default function App() {
           role,
           email,
           interests: defaultInterests,
-          myEventIds: []
+          myEventIds: [],
+          isAdmin: true // Mock users are admins for demo
       };
       setUser(newUser);
       setIsAuthOpen(false);
+  };
+
+  const handleAdminLogin = (name: string, role: Role, email: string) => {
+      const defaultInterests = ['Администрирование', 'Управление', 'Контроль'];
+      const adminUser: User = {
+          id: 'admin-user-' + Date.now(),
+          name,
+          role,
+          email,
+          interests: defaultInterests,
+          myEventIds: [],
+          isAdmin: true // Admin user
+      };
+      setUser(adminUser);
+      setIsAuthOpen(false);
+      setView('admin'); // Automatically open admin panel
+  };
+
+  const handleRefreshRegistrations = async () => {
+    // Reload registrations from localStorage for current user
+    if (user) {
+      // For admin, load all approved registrations
+      if (user.isAdmin) {
+        const approvedRegs = await getApprovedRegistrations();
+        setUserRegistrations(approvedRegs);
+      } else {
+        // For regular users, load only their registrations
+        const regs = await getUserRegistrations(user.id);
+        setUserRegistrations(regs);
+      }
+    }
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
@@ -126,29 +224,35 @@ export default function App() {
       return;
     }
     
-    const isRegistered = user.myEventIds.includes(eventId);
+    // Check if already registered
+    const existingReg = userRegistrations.find(r => r.eventId === eventId);
     
-    // Optimistic update
-    let newIds;
-    if (isRegistered) {
-      newIds = user.myEventIds.filter(id => id !== eventId);
-      toast.info("Вы отменили регистрацию");
+    if (existingReg) {
+      // Already has a registration
+      if (existingReg.status === 'pending') {
+        toast.info("Ваша заявка ожидает одобрения администратора");
+      } else if (existingReg.status === 'approved') {
+        toast.info("Вы уже записаны на это мероприятие");
+      } else {
+        toast.error("Ваша заявка была отклонена");
+      }
+      return;
+    }
+    
+    // Create new registration request
+    const registration = await createRegistration(user.id, eventId);
+    if (registration) {
+      setUserRegistrations(prev => [...prev, registration]);
+      toast.success("Заявка отправлена! Ожидайте одобрения администратора.");
     } else {
-      newIds = [...user.myEventIds, eventId];
-      toast.success("Вы успешно записаны на мероприятие!");
+      toast.error("Ошибка при отправке заявки");
     }
-    setUser({ ...user, myEventIds: newIds });
-
-    // API call
-    const { error } = await toggleRegistration(user.id, eventId, isRegistered);
-    if (error) {
-        // If it's a mock user (demo mode), ignore DB errors
-        if (user.id.startsWith('mock-user')) {
-            return;
-        }
-        // Revert if error and not mock user
-        toast.error("Ошибка при обновлении регистрации");
-    }
+  };
+  
+  // Helper function to get registration status for an event
+  const getRegistrationStatus = (eventId: string): 'none' | 'pending' | 'approved' | 'rejected' => {
+    const reg = userRegistrations.find(r => r.eventId === eventId);
+    return reg ? reg.status : 'none';
   };
 
   const handleAskAI = async () => {
@@ -202,27 +306,69 @@ export default function App() {
       <Header 
         user={user} 
         onLogout={handleLogout} 
-        onProfileClick={() => setView('profile')} 
+        onProfileClick={() => {
+          handleRefreshRegistrations();
+          setView('profile');
+        }} 
         onLoginClick={() => setIsAuthOpen(true)}
-        onEventsClick={() => setView('catalog')}
+        onEventsClick={() => {
+          // Admin cannot navigate to events catalog
+          if (user?.isAdmin) {
+            setView('admin');
+          } else {
+            setView('catalog');
+          }
+        }}
+        onCalendarClick={() => {
+          if (!user) {
+            setIsAuthOpen(true);
+            return;
+          }
+          handleRefreshRegistrations();
+          setView('profile');
+        }}
+        onAdminClick={() => setView('admin')}
       />
 
       <Auth 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
         onMockLogin={handleMockLogin} 
+        onAdminLogin={handleAdminLogin}
       />
       
       <main className="flex-1 container mx-auto px-4 py-8">
         {view === 'profile' && user ? (
           <UserProfile 
             user={user} 
-            myEvents={events.filter(e => user.myEventIds.includes(e.id))}
+            myEvents={events.filter(e => {
+              // Include approved events from myEventIds
+              if (user.myEventIds.includes(e.id)) return true;
+              // Include events with any registration (pending, approved, rejected)
+              const hasRegistration = userRegistrations.some(r => r.eventId === e.id);
+              return hasRegistration;
+            })}
+            userRegistrations={userRegistrations}
             onBack={() => setView('catalog')} 
             onUpdateUser={handleUpdateUser}
           />
+        ) : view === 'admin' ? (
+          <AdminPanel 
+            user={user} 
+            onBack={() => setView('catalog')} 
+            events={events}
+            userRegistrations={userRegistrations}
+            onRegistrationsUpdate={handleRefreshRegistrations}
+          />
         ) : (
           <div className="space-y-10">
+            
+            {/* API Key Setup Notice */}
+            <ApiKeySetupNotice 
+              isConfigured={apiKeyConfigured}
+              isChecking={isCheckingApiKey}
+              onRecheck={handleRecheckApiKey}
+            />
             
             {/* AI Assistant Banner */}
             <div className="bg-white rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-sm border border-blue-100">
@@ -249,8 +395,8 @@ export default function App() {
                      disabled={isAiLoading}
                      className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-full px-8 h-14 text-lg font-medium shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40"
                    >
-                     {isAiLoading ? 'Думаю...' : (user ? 'Подобрать события' : 'Войти и подобрать')}
-                     <Bot className="ml-2 w-5 h-5" />
+                     {isAiLoading ? 'AI анализирует...' : (user ? 'Подобрать с AI' : 'Войти и подобрать')}
+                     <Sparkles className="ml-2 w-5 h-5" />
                    </Button>
                  </div>
               </div>
@@ -281,7 +427,8 @@ export default function App() {
                     return (
                       <div 
                         key={event.id} 
-                        className="group bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col md:flex-row gap-6"
+                        onClick={() => setSelectedEvent(event)}
+                        className="group bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col md:flex-row gap-6 cursor-pointer"
                         style={{ animationDelay: `${index * 100}ms` }}
                       >
                         {/* Image Section */}
@@ -316,7 +463,7 @@ export default function App() {
                           <div className="flex flex-wrap gap-3 mb-6">
                             <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
                               <Calendar className="w-4 h-4 text-blue-500" />
-                              {new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                              {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
                               <Clock className="w-4 h-4 text-blue-500" />
@@ -336,7 +483,10 @@ export default function App() {
                              </div>
                              
                              <Button 
-                               onClick={() => toggleRegister(event.id)}
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 toggleRegister(event.id);
+                               }}
                                variant={isRegistered ? "outline" : "default"}
                                className={`rounded-xl transition-all ${
                                  isRegistered 
@@ -437,6 +587,7 @@ export default function App() {
                       event={event} 
                       isRegistered={user?.myEventIds.includes(event.id)}
                       onToggleRegister={toggleRegister}
+                      onClick={() => setSelectedEvent(event)}
                     />
                   ))}
                 </div>
@@ -455,6 +606,13 @@ export default function App() {
       </main>
 
       <FooterDog />
+      
+      {/* Event Details Modal */}
+      <EventDetailsModal 
+        event={selectedEvent} 
+        isOpen={!!selectedEvent} 
+        onClose={() => setSelectedEvent(null)} 
+      />
     </div>
   );
 }
