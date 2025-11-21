@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { getAllRegistrations, updateRegistrationStatus } from '../../utils/dbService';
+import { getAllRegistrations, updateRegistrationStatus, getUserProfile } from '../../utils/dbService';
 import { EventRegistration, Event, User as UserType } from '../../data/mock';
 import { EventImporter } from './EventImporter';
 import { EventScraperPanel } from './EventScraperPanel';
@@ -23,6 +23,7 @@ export function AdminPanel({ events, user, onBack, userRegistrations: initialReg
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [activeTab, setActiveTab] = useState<'registrations' | 'import' | 'scraper'>('registrations');
+  const [userProfiles, setUserProfiles] = useState<Map<string, UserType>>(new Map());
 
   useEffect(() => {
     loadRegistrations();
@@ -32,6 +33,19 @@ export function AdminPanel({ events, user, onBack, userRegistrations: initialReg
     setLoading(true);
     const regs = await getAllRegistrations();
     setRegistrations(regs);
+    
+    // Load user profiles for all registrations
+    const profilesMap = new Map<string, UserType>();
+    for (const reg of regs) {
+      if (!profilesMap.has(reg.userId)) {
+        const profile = await getUserProfile(reg.userId);
+        if (profile) {
+          profilesMap.set(reg.userId, profile);
+        }
+      }
+    }
+    setUserProfiles(profilesMap);
+    
     setLoading(false);
   };
 
@@ -144,13 +158,13 @@ export function AdminPanel({ events, user, onBack, userRegistrations: initialReg
             <Calendar className="w-4 h-4 mr-2" />
             Заявки на мероприятия
           </TabsTrigger>
-          <TabsTrigger value="import">
-            <Download className="w-4 h-4 mr-2" />
-            Импорт мероприятий
-          </TabsTrigger>
           <TabsTrigger value="scraper">
             <Globe className="w-4 h-4 mr-2" />
-            Сбор мероприятий
+            Сбор мероприятий (AI)
+          </TabsTrigger>
+          <TabsTrigger value="import">
+            <Download className="w-4 h-4 mr-2" />
+            Ручной импорт
           </TabsTrigger>
         </TabsList>
 
@@ -237,6 +251,7 @@ export function AdminPanel({ events, user, onBack, userRegistrations: initialReg
             ) : (
               filteredRegistrations.map(registration => {
                 const event = getEventById(registration.eventId);
+                const userProfile = userProfiles.get(registration.userId);
 
                 return (
                   <Card key={registration.id}>
@@ -262,8 +277,19 @@ export function AdminPanel({ events, user, onBack, userRegistrations: initialReg
                           <div className="flex items-center gap-3">
                             <User className="w-5 h-5 text-gray-400" />
                             <div>
-                              <div className="text-sm">Пользователь {registration.userId.substring(0, 8)}...</div>
-                              <div className="text-xs text-gray-500">ID: {registration.userId}</div>
+                              {userProfile ? (
+                                <>
+                                  <div className="text-sm font-medium">{userProfile.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {userProfile.email} • {userProfile.role}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-sm">Пользователь {registration.userId.substring(0, 8)}...</div>
+                                  <div className="text-xs text-gray-500">ID: {registration.userId}</div>
+                                </>
+                              )}
                             </div>
                           </div>
 

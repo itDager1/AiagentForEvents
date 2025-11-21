@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, MapPin, ExternalLink, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, ExternalLink, X, Building2 } from 'lucide-react';
 import { Event } from '../../data/mock';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -81,25 +81,19 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 sm:col-span-2">
                     <div className="p-2.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
                         <Calendar className="w-5 h-5" />
                     </div>
                     <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Дата</p>
                         <p className="font-semibold text-slate-900">
-                            {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { 
+                                day: 'numeric', 
+                                month: 'long', 
+                                year: 'numeric'
+                            })}
                         </p>
-                    </div>
-                </div>
-                
-                <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                    <div className="p-2.5 bg-white rounded-xl shadow-sm text-blue-600 shrink-0">
-                        <Clock className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Время</p>
-                        <p className="font-semibold text-slate-900">{new Date(event.date).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'})}</p>
                     </div>
                 </div>
 
@@ -120,6 +114,25 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     {event.description}
                 </p>
             </div>
+
+            {event.partners && event.partners.length > 0 && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <h3 className="text-lg font-bold text-slate-900">Партнеры и спонсоры</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        {event.partners.map((partner, index) => (
+                            <div 
+                                key={index}
+                                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium text-sm flex items-center shadow-sm"
+                            >
+                                {partner}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {event.originalLink && (
                 <div className="pt-4 sm:hidden">

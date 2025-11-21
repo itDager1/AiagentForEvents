@@ -114,7 +114,7 @@ async function searchEventByQuery(query: string): Promise<Partial<Event> | null>
 
 Пожалуйста, верни информацию в формате JSON:
 {
-  "title": "Точное название мероприятия",
+  "title": "Точное название мероприятия (включая номер, если это митап)",
   "description": "Подробное описание мероприятия (2-3 предложения)",
   "date": "Дата начала в формате ISO (YYYY-MM-DDTHH:mm:ss)",
   "displayDate": "Красиво отформатированная дата для отображения (например, '27–28 ноября 2025')",
@@ -122,15 +122,21 @@ async function searchEventByQuery(query: string): Promise<Partial<Event> | null>
   "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
   "location": "Место проведения",
   "tags": ["тег1", "тег2", "тег3"],
-  "originalLink": "Официальный сайт мероприятия"
+  "originalLink": "Официальный сайт мероприятия",
+  "partners": ["Название партнера 1", "Название партнера 2"]
 }
 
 ВАЖНО:
-- Даты должны быть актуальными и в будущем
-- Если мероприятие не найдено или информация устарела, верни null
-- Формат даты ISO: YYYY-MM-DDTHH:mm:ss
-- Категория должна быть одной из: "Обучение", "Хакатон", "Митап", "Конференция"
-- Формат должен быть одним из: "Онлайн", "Оффлайн", "Гибрид"
+- щи ТОЛЬКО будущие мероприятия (дата после ${new Date().toISOString().split('T')[0]})
+- Если название содержит номер (например, Moscow Python Meetup #90), ОБЯЗАТЕЛЬНО проверь, какой номер актуален сейчас. Не используй старые номера.
+- Если мероприятие регулярное (митап), найди информацию именно о БЛИЖАЙШЕМ.
+- Даты должны быть точными.
+- Найди 3-5 ключевых партнеров или спонсоров события.
+- Если партнеры не найдены, верни пустой массив [].
+- Если мероприятие не найдено или информация устарела, верни null.
+- Формат даты ISO: YYYY-MM-DDTHH:mm:ss.
+- Категория должна быть одной из: "Обучение", "Хакатон", "Митап", "Конференция".
+- Формат должен быть одним из: "Онлайн", "Оффлайн", "Гибрид".
 
 Верни ТОЛЬКО JSON объект или null, без дополнительного текста.`;
 
@@ -143,7 +149,7 @@ async function searchEventByQuery(query: string): Promise<Partial<Event> | null>
         'X-Title': 'Exact Direction Event Search'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model: 'perplexity/sonar',
         messages: [
           {
             role: 'system',
@@ -209,7 +215,8 @@ async function searchEventByQuery(query: string): Promise<Partial<Event> | null>
       location: eventData.location,
       tags: eventData.tags || [],
       image: imageUrl,
-      originalLink: eventData.originalLink
+      originalLink: eventData.originalLink,
+      partners: eventData.partners || []
     };
   } catch (error) {
     console.error('Error searching event:', error);
@@ -303,35 +310,62 @@ async function extractEventDataWithAI(htmlContent: string, originalUrl: string):
     // Clean the HTML to reduce token usage
     const cleanedContent = cleanHtmlContent(htmlContent);
     
-    const prompt = `Проанализируй следующий HTML код страницы мероприятия и извлеки структурированную информацию.
+    // Extract current year for context
+    const currentYear = new Date().getFullYear();
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    const prompt = `Ты - эксперт по извлечению информации о IT-мероприятиях с веб-сайтов.
+
+ТЕКУЩАЯ ДАТА: ${currentDate}
+
+Проанализируй содержимое следующей веб-страницы и извлеки ТОЧНУЮ информацию о мероприятии:
 
 URL: ${originalUrl}
 
-HTML (фрагмент):
-${cleanedContent.substring(0, 4000)}
+СОДЕРЖИМОЕ СТРАНИЦЫ:
+${cleanedContent.substring(0, 5000)}
 
-Пожалуйста, извлеки следующую информацию и верни в формате JSON:
+КРИТИЧЕСКИ ВАЖНО - ИЗВЛЕЧЕНИЕ ДАТ:
+1. Найди ТОЧНЫЕ даты проведения мероприятия на странице
+2. Обрати внимание на:
+   - Элементы <time> с атрибутами datetime
+   - Текст вида "27-28 ноября 2025" или "November 27-28, 2025"
+   - Блоки с классами типа .date, .event-date, .schedule
+   - Мета-теги с датами события
+3. Если видишь несколько дат (например, диапазон), используй дату НАЧАЛА мероприятия
+4. Убедись, что дата в будущем (после ${currentDate})
+5. Если мероприятие уже прошло - верни null
+
+ФОРМАТ ДАТЫ:
+- ISO формат: YYYY-MM-DDTHH:mm:ss
+- Если время не указано, используй 10:00:00 для дневных событий
+- Для онлайн-событий можно использовать 19:00:00
+
+Верни JSON в следующем формате:
 {
-  "title": "Название мероприятия",
-  "description": "Подробное описание мероприятия (2-3 предложения)",
-  "date": "Дата начала в формате ISO (YYYY-MM-DDTHH:mm:ss)",
-  "displayDate": "Красиво отформатированная дата для отображения (например, '27–28 ноября 2025')",
+  "title": "Точное официальное название мероприятия со страницы",
+  "description": "Краткое описа��ие из официального источника (2-3 предложения)",
+  "date": "YYYY-MM-DDTHH:mm:ss (ТОЧНАЯ дата начала)",
+  "displayDate": "Красивая дата для показа (например: '27–28 ноября 2025')",
   "format": "Онлайн" | "Оффлайн" | "Гибрид",
   "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
-  "location": "Место проведения",
-  "tags": ["тег1", "тег2", "тег3"]
+  "location": "Точное место проведения",
+  "tags": ["тег1", "тег2", "тег3"],
+  "partners": ["Партнер 1", "Партнер 2"]
 }
 
-ВАЖНО:
-- Даты должны быть абсолютно точными и соответствовать информации на сайте
-- Если дата в прошлом, пропусти мероприятие
-- Формат даты ISO: YYYY-MM-DDTHH:mm:ss
-- Категория должна быть одной из: "Обучение", "Хакатон", "Митап", "Конференция"
-- Формат должен быть одним из: "Онлайн", "Оффлайн", "Гибрид"
-- Теги должны быть на английском и релевантны тематике
-- Описание должно быть информативным и кратким
+ПРИМЕРЫ ПРАВИЛЬНОГО ИЗВЛЕЧЕНИЯ ДАТ:
+- "27-28 ноября 2025" → date: "2025-11-27T10:00:00", displayDate: "27–28 ноября 2025"
+- "15 декабря 2025, 18:00" → date: "2025-12-15T18:00:00", displayDate: "15 декабря 2025"
+- "20-21 October 2025" → date: "2025-10-20T10:00:00", displayDate: "20–21 октября 2025"
 
-Верни ТОЛЬКО JSON объект, без дополнительного текста.`;
+ПРОВЕРКИ:
+✓ Дата должна быть по��ле ${currentDate}
+✓ Год должен быть ${currentYear} или позже
+✓ Формат ISO должен быть валидным
+✓ Если дата не найдена или прошла - верни null
+
+Верни ТОЛЬКО JSON объект или null, БЕЗ дополнительного текста или markdown.`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -342,19 +376,19 @@ ${cleanedContent.substring(0, 4000)}
         'X-Title': 'Exact Direction Event Scraper'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini',
+        model: 'perplexity/sonar',
         messages: [
           {
             role: 'system',
-            content: 'Ты - эксперт по извлечению структурированных данных о мероприятиях из HTML. Всегда возвращай валидный JSON с точными датами.'
+            content: 'Ты - эксперт по извлечению структурированных данных о мероприятиях из HTML. Твоя главная задача - найти ТОЧНЫЕ даты с официальных сайтов. Ты ВСЕГДА проверяешь актуальность дат. Возвращай только валидный JSON с точными датами или null.'
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        temperature: 0.1, // Low temperature for more consistent/factual extraction
-        max_tokens: 1000
+        temperature: 0.1, // Very low temperature for factual extraction
+        max_tokens: 1500
       })
     });
     
@@ -365,7 +399,15 @@ ${cleanedContent.substring(0, 4000)}
     }
     
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    const aiResponse = data.choices[0].message.content.trim();
+    
+    console.log('AI Response:', aiResponse);
+    
+    // Check if response is null
+    if (aiResponse === 'null' || aiResponse === 'NULL' || aiResponse.toLowerCase() === 'null') {
+      console.log('AI returned null - event not found or date is in the past');
+      return null;
+    }
     
     // Parse the JSON response
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
@@ -382,12 +424,28 @@ ${cleanedContent.substring(0, 4000)}
       return null;
     }
     
-    // Validate date is in the future
+    // CRITICAL: Validate date is in the future
     const eventDate = new Date(eventData.date);
-    if (eventDate < new Date()) {
-      console.error('Event date is in the past, skipping');
+    const now = new Date();
+    
+    if (isNaN(eventDate.getTime())) {
+      console.error('Invalid date format:', eventData.date);
       return null;
     }
+    
+    if (eventDate < now) {
+      console.error('Event date is in the past:', eventData.date, '(current:', now.toISOString(), ')');
+      return null;
+    }
+    
+    // Validate year is reasonable (current year or next 2 years)
+    const eventYear = eventDate.getFullYear();
+    if (eventYear < currentYear || eventYear > currentYear + 2) {
+      console.error('Event year seems incorrect:', eventYear);
+      return null;
+    }
+    
+    console.log('✓ Valid event date extracted:', eventData.date);
     
     // Generate image URL using Unsplash
     const imageQuery = eventData.tags?.slice(0, 2).join(' ') || eventData.category || 'tech conference';
@@ -403,7 +461,8 @@ ${cleanedContent.substring(0, 4000)}
       location: eventData.location,
       tags: eventData.tags || [],
       image: imageUrl,
-      originalLink: originalUrl
+      originalLink: originalUrl,
+      partners: eventData.partners || []
     };
   } catch (error) {
     console.error('Error extracting data with AI:', error);
@@ -426,10 +485,40 @@ function cleanHtmlContent(html: string): string {
   const parser = new DOMParser();
   const doc = parser.parseFromString(cleaned, 'text/html');
   
+  // Extract metadata
+  const title = doc.querySelector('h1')?.textContent || '';
+  const metaDescription = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+  
+  // Extract time elements with datetime attributes (CRITICAL for accurate dates)
+  const timeElements: string[] = [];
+  doc.querySelectorAll('time[datetime]').forEach(time => {
+    const datetime = time.getAttribute('datetime');
+    const text = time.textContent;
+    timeElements.push(`TIME: ${text} (datetime: ${datetime})`);
+  });
+  
+  // Extract date-related elements
+  const dateElements: string[] = [];
+  const dateSelectors = [
+    '.date', '.event-date', '.schedule-date', '[class*="date"]',
+    '[class*="Date"]', '.datetime', '.event-time', '[itemprop="startDate"]',
+    '[itemprop="endDate"]', '.calendar-date', '.event-schedule'
+  ];
+  
+  dateSelectors.forEach(selector => {
+    doc.querySelectorAll(selector).forEach(el => {
+      const text = el.textContent?.trim();
+      if (text && text.length < 100) { // Avoid long text blocks
+        dateElements.push(`DATE: ${text}`);
+      }
+    });
+  });
+  
   // Get main content areas
   const contentSelectors = [
     'main', 'article', '[role="main"]', '.content', '.event-details',
-    '.description', 'h1', 'h2', 'h3', 'time', '.date', '.location'
+    '.description', '.event-description', 'h1', 'h2', 'h3', '.location',
+    '.event-location', '.venue', '[itemprop="location"]'
   ];
   
   let relevantText = '';
@@ -448,12 +537,37 @@ function cleanHtmlContent(html: string): string {
   // Clean up whitespace
   relevantText = relevantText.replace(/\s+/g, ' ').trim();
   
-  // Return structured representation
+  // Extract JSON-LD structured data (often contains event dates)
+  const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+  let jsonLdData = '';
+  jsonLdScripts.forEach(script => {
+    try {
+      const data = JSON.parse(script.textContent || '');
+      if (data['@type'] === 'Event' || data.eventSchedule || data.startDate) {
+        jsonLdData += '\nJSON-LD Event Data: ' + JSON.stringify(data);
+      }
+    } catch (e) {
+      // Ignore invalid JSON
+    }
+  });
+  
+  // Return structured representation with emphasis on dates
   return `
-    Title: ${doc.querySelector('h1')?.textContent || ''}
-    Meta Description: ${doc.querySelector('meta[name="description"]')?.getAttribute('content') || ''}
-    Content: ${relevantText.substring(0, 3000)}
-  `;
+=== ОФИЦИАЛЬНАЯ ИНФОРМАЦИЯ О МЕРОПРИЯТИИ ===
+
+Название: ${title}
+Мета-описание: ${metaDescription}
+
+=== ДАТЫ (КРИТИЧЕСКИ ВАЖНО) ===
+${timeElements.length > 0 ? timeElements.join('\n') : 'Не найдено элементов <time>'}
+${dateElements.length > 0 ? '\n' + dateElements.join('\n') : ''}
+
+=== СТРУКТУРИР��ВАННЫЕ ДАННЫЕ ===
+${jsonLdData || 'Не найдено JSON-LD данных'}
+
+=== ОСНОВНОЙ КОНТЕНТ ===
+${relevantText.substring(0, 2500)}
+  `.trim();
 }
 
 /**

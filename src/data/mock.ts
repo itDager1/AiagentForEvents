@@ -13,6 +13,7 @@ export interface User {
   email: string;
   interests: string[];
   schedule?: WorkSchedule;
+  scheduleStartDate?: string; // ISO date string for shift start
   myEventIds: string[];
   isAdmin?: boolean; // New field for admin users
 }
@@ -29,6 +30,7 @@ export interface Event {
   tags: string[];
   image: string;
   originalLink?: string;
+  partners?: string[];
 }
 
 export interface EventRegistration {
@@ -43,8 +45,8 @@ export interface EventRegistration {
 export const MOCK_EVENTS: Event[] = [
   {
     id: '1',
-    title: 'HighLoad++ 2025',
-    description: 'Профессиональная конференция для разработчиков высоконагруженных систем. Архитектура, БД, безопасность и масштабирование.',
+    title: 'HighLoad++ Foundation 2025',
+    description: 'Крупнейшая профессиональная конференция для разработчиков высоконагруженных систем.',
     date: '2025-11-27T09:00:00',
     displayDate: '27–28 ноября 2025',
     format: 'Оффлайн',
@@ -56,34 +58,8 @@ export const MOCK_EVENTS: Event[] = [
   },
   {
     id: '2',
-    title: 'HolyJS 2025 Autumn',
-    description: 'Главная JavaScript-конференция года. React 19, Server Components, Edge Computing и инструменты разработки.',
-    date: '2025-10-29T10:00:00',
-    displayDate: '29 октября, 20–21 ноября',
-    format: 'Гибрид',
-    category: 'Конференция',
-    location: 'Санкт-Петербург / Online',
-    tags: ['JavaScript', 'React', 'Web'],
-    image: 'https://images.unsplash.com/photo-1568716353609-12ddc5c67f04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxqYXZhc2NyaXB0JTIwY29kZSUyMGNvbmZlcmVuY2V8ZW58MXx8fHwxNzYzNjQ3MDg5fDA&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://holyjs.ru'
-  },
-  {
-    id: '3',
-    title: 'Heisenbug 2025 Autumn',
-    description: 'Большая техническая конференция по тестированию. Автоматизация, инструменты QA, нагрузочное тестирование.',
-    date: '2025-12-15T10:00:00',
-    displayDate: '15–16 декабря 2025',
-    format: 'Оффлайн',
-    category: 'Конференция',
-    location: 'Москва',
-    tags: ['QA', 'Testing', 'Automation'],
-    image: 'https://images.unsplash.com/photo-1584188335984-7781d3194e03?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzb2Z0d2FyZSUyMHRlc3RpbmclMjBxYSUyMGJ1Z3xlbnwxfHx8fDE3NjM2NjYxODF8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://heisenbug.ru'
-  },
-  {
-    id: '4',
     title: 'Mobius 2025 Autumn',
-    description: 'Конференция для мобильных разработчиков. iOS, Android, кроссплатформа, архитектура мобильных приложений.',
+    description: 'Профессиональная конференция по мобильной разработке. iOS, Android, кроссплатформа.',
     date: '2025-12-05T10:00:00',
     displayDate: '5–6 декабря 2025',
     format: 'Оффлайн',
@@ -94,9 +70,35 @@ export const MOCK_EVENTS: Event[] = [
     originalLink: 'https://mobiusconf.com'
   },
   {
+    id: '3',
+    title: 'Heisenbug 2025 Autumn',
+    description: 'Крупная техническая конференция по тестированию и обеспечению качества.',
+    date: '2025-12-11T10:00:00',
+    displayDate: '11–12 декабря 2025',
+    format: 'Оффлайн',
+    category: 'Конференция',
+    location: 'Москва',
+    tags: ['QA', 'Testing', 'Automation'],
+    image: 'https://images.unsplash.com/photo-1584188335984-7781d3194e03?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzb2Z0d2FyZSUyMHRlc3RpbmclMjBxYSUyMGJ1Z3xlbnwxfHx8fDE3NjM2NjYxODF8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    originalLink: 'https://heisenbug.ru'
+  },
+  {
+    id: '4',
+    title: 'DotNext 2025 Autumn',
+    description: 'Главная конференция для .NET-разработчиков в России. Architecture, Performance, Internals.',
+    date: '2025-12-15T10:00:00',
+    displayDate: '15–16 декабря 2025',
+    format: 'Гибрид',
+    category: 'Конференция',
+    location: 'Москва / Online',
+    tags: ['.NET', 'C#', 'Backend'],
+    image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb2RpbmclMjBtaWNyb3NvZnR8ZW58MXx8fHwxNzYzNjQ3MDg5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+    originalLink: 'https://dotnext.ru'
+  },
+  {
     id: '5',
     title: 'SberTech Winter Hack',
-    description: 'Новогодний хакатон от СберТеха. Создай лучшее решение для экосистемы и выиграй призы под елку.',
+    description: 'Традиционный зимний хакатон от СберТеха. Решение реальных задач экосистемы.',
     date: '2025-12-20T10:00:00',
     displayDate: '20–21 декабря 2025',
     format: 'Оффлайн',
@@ -104,12 +106,25 @@ export const MOCK_EVENTS: Event[] = [
     location: 'Москва, Кутузовский 32',
     tags: ['Hackathon', 'Fintech', 'Innovation'],
     image: 'https://images.unsplash.com/photo-1662252900942-2d7e1feb6494?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoYWNrYXRob24lMjBjb2RpbmclMjB3aW50ZXJ8ZW58MXx8fHwxNzYzNjQ3MDg5fDA&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://sbertech.ru'
+    originalLink: 'https://sber-tech.ru'
   },
   {
     id: '6',
-    title: 'Podlodka Techlead Crew',
-    description: 'Двухнедельный интенсив для техлидов. Управление командой, процессы, архитектура и найм.',
+    title: 'Moscow Python Meetup',
+    description: 'Регулярная встреча московского сообщества Python-разработчиков. Доклады, нетворкинг и пицца.',
+    date: '2025-12-25T19:00:00',
+    displayDate: '25 декабря 2025',
+    format: 'Оффлайн',
+    category: 'Митап',
+    location: 'Москва',
+    tags: ['Python', 'Backend', 'Community'],
+    image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf5e2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxweXRob24lMjBjb2RlLnxlbnwxfHx8fDE3NjM2NjYxODF8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    originalLink: 'https://moscowpython.ru'
+  },
+  {
+    id: '7',
+    title: 'Podlodka Techlead Crew #14',
+    description: 'Двухнедельный интенсив для технических лидеров и руководителей команд.',
     date: '2026-02-16T19:00:00',
     displayDate: '16 февраля – 1 марта 2026',
     format: 'Онлайн',
@@ -120,78 +135,67 @@ export const MOCK_EVENTS: Event[] = [
     originalLink: 'https://podlodka.io'
   },
   {
-    id: '7',
-    title: 'Joker 2026',
-    description: 'Легендарная Java-конференция. JVM, Spring Boot, производительность и облачные технологии.',
-    date: '2026-10-20T10:00:00',
-    displayDate: '20–21 октября 2026',
+    id: '8',
+    title: 'FrontendConf 2026',
+    description: 'Главная конференция по фронтенд-разработке. Современные фреймворки, производительность и UI/UX.',
+    date: '2026-05-28T10:00:00',
+    displayDate: '28–29 мая 2026',
     format: 'Оффлайн',
     category: 'Конференция',
-    location: 'Санкт-Петербург',
-    tags: ['Java', 'Backend', 'Spring'],
-    image: 'https://images.unsplash.com/photo-1687603858673-a08a2dc2302c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxqYXZhJTIwY29kZSUyMHByb2dyYW1taW5nfGVufDF8fHx8MTc2MzY2NjE4MXww&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://jokerconf.com'
+    location: 'Москва',
+    tags: ['Frontend', 'React', 'Web'],
+    image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&q=80&w=1000',
+    originalLink: 'https://frontendconf.ru'
   },
   {
-    id: '8',
-    title: 'CodeFest 15',
-    description: 'Самая душевная IT-конференция за Уралом. Разработка, тестирование, управление, дизайн.',
-    date: '2026-05-25T09:00:00',
-    displayDate: '25–26 мая 2026',
+    id: '9',
+    title: 'CodeFest 16',
+    description: 'Крупнейшая IT-конференция за Уралом. Разработка, тестирование, управление продуктом и дизайн.',
+    date: '2026-05-23T09:00:00',
+    displayDate: '23–24 мая 2026',
     format: 'Оффлайн',
     category: 'Конференция',
-    location: 'Новосибирск',
+    location: 'Новосибирск, Экспоцентр',
     tags: ['General', 'Community', 'Siberia'],
     image: 'https://images.unsplash.com/photo-1560523159-94c9d18bcf27?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0ZWNoJTIwY29uZmVyZW5jZSUyMGNyb3dkJTIwc3RhZ2V8ZW58MXx8fHwxNzYzNjY2MTgxfDA&ixlib=rb-4.1.0&q=80&w=1080',
     originalLink: 'https://codefest.ru'
   },
   {
-    id: '9',
+    id: '10',
     title: 'GigaConf 2026',
-    description: 'Технологическая конференция Сбера. Искусственный интеллект, большие данные и инновации.',
-    date: '2026-06-20T10:00:00',
-    displayDate: '20 июня 2026',
+    description: 'Технологическая конференция Сбера для разработчиков и инженеров.',
+    date: '2026-06-27T10:00:00',
+    displayDate: '27 июня 2026',
     format: 'Оффлайн',
     category: 'Конференция',
-    location: 'Москва',
-    tags: ['AI', 'Tech', 'Sber'],
+    location: 'Москва, ВДНХ',
+    tags: ['AI', 'Sber', 'Tech'],
     image: 'https://images.unsplash.com/photo-1760629863094-5b1e8d1aae74?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhcnRpZmljaWFsJTIwaW50ZWxsaWdlbmNlJTIwcm9ib3QlMjB0ZWNofGVufDF8fHx8MTc2MzY2NjE4MXww&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://giga.sber'
-  },
-  {
-    id: '10',
-    title: 'Go Gopher Meetup',
-    description: 'Встреча сообщества Go-разработчиков. Обсуждаем дженерики, конкурентность и микросервисы.',
-    date: '2026-01-15T18:00:00',
-    format: 'Оффлайн',
-    category: 'Митап',
-    location: 'Нижний Новгород',
-    tags: ['Golang', 'Backend', 'Community'],
-    image: 'https://images.unsplash.com/photo-1636471339409-8eb98c018b0e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xhbmclMjBwcm9ncmFtbWluZ3xlbnwxfHx8fDE3NjM2NDcwOTN8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    originalLink: 'https://go.dev'
+    originalLink: 'https://developers.sber.ru'
   },
   {
     id: '11',
-    title: 'Frontend Architecture Talk',
-    description: 'Глубокое погружение в архитектуру современных веб-приложений. Микрофронтенды и стейт-менеджмент.',
-    date: '2026-03-28T19:00:00',
-    format: 'Онлайн',
-    category: 'Митап',
-    location: 'YouTube Stream',
-    tags: ['Frontend', 'React', 'Architecture'],
-    image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&q=80&w=1000',
-    originalLink: 'https://youtube.com'
+    title: 'Kazan Digital Week 2026',
+    description: 'Международный форум цифровой трансформации. Госсектор, инновации и кибербезопасность.',
+    date: '2026-09-24T10:00:00',
+    displayDate: '24–27 сентября 2026',
+    format: 'Гибрид',
+    category: 'Конференция',
+    location: 'Казань, Казань Экспо',
+    tags: ['GovTech', 'Digital', 'Security'],
+    image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=1000',
+    originalLink: 'https://kazandigitalweek.com/ru/site'
   },
   {
     id: '12',
-    title: 'Design System Meetup',
-    description: 'Обсуждаем обновления дизайн-системы и новые компоненты UI кита. Встреча с авторами дизайн-системы.',
-    date: '2026-04-05T16:00:00',
-    format: 'Онлайн',
+    title: 'Go Gopher Meetup',
+    description: 'Встреча сообщества Go-разработчиков. Микросервисы и конкурентность.',
+    date: '2026-02-05T18:30:00',
+    format: 'Оффлайн',
     category: 'Митап',
-    location: 'Zoom',
-    tags: ['Design', 'UI/UX', 'Frontend'],
-    image: 'https://images.unsplash.com/photo-1586717791821-3f44a5638d48?auto=format&fit=crop&q=80&w=1000',
-    originalLink: 'https://figma.com'
+    location: 'Екатеринбург',
+    tags: ['Golang', 'Backend'],
+    image: 'https://images.unsplash.com/photo-1636471339409-8eb98c018b0e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxnb2xhbmclMjBwcm9ncmFtbWluZ3xlbnwxfHx8fDE3NjM2NDcwOTN8MA&ixlib=rb-4.1.0&q=80&w=1080',
+    originalLink: 'https://go.dev/community'
   }
 ];

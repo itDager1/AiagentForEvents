@@ -127,7 +127,8 @@ app.post('/signup', async (c) => {
               {"role": "system", "content": "You are a helpful recommendation assistant for the 'Exact Direction' app. You have access to real-time data. You must output valid JSON only (an array of strings for recommendations, or specific format requested). Do not include markdown formatting."},
               {"role": "user", "content": prompt}
             ],
-            "temperature": 0.7
+            "temperature": 0.7,
+            "max_tokens": 1000
           })
         });
     
@@ -202,7 +203,8 @@ app.post('/signup', async (c) => {
               {"role": "system", "content": "You are a helpful assistant that finds real-time event data. Return only valid JSON array. No markdown."},
               {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1 // Lower temperature for more factual data
+            "temperature": 0.1, // Lower temperature for more factual data
+            "max_tokens": 4000
           })
         });
 

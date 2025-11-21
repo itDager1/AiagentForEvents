@@ -12,10 +12,11 @@ import { getAIRecommendations } from './utils/aiService';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Input } from './components/ui/input';
-import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown, Shield } from 'lucide-react';
+import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown, Shield, RefreshCw, Search as SearchIcon } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Toaster } from 'sonner@2.0.3';
+import { scrapeEventInformation } from './utils/eventScraperService';
 import { supabase } from './utils/supabaseClient';
 import { 
   fetchEvents, 
@@ -53,6 +54,54 @@ export default function App() {
   // AI State
   const [aiRecommendations, setAiRecommendations] = useState<Event[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isUpdatingEvents, setIsUpdatingEvents] = useState(false);
+
+  const handleUpdateEvents = async () => {
+    setIsUpdatingEvents(true);
+    toast.info("Ищу новые события в интернете...");
+    
+    const queries = [
+      "Крупная IT конференция 2025 Россия",
+      "Frontend митап Москва 2025",
+      "Хакатон по искусственному интеллекту 2025",
+      "DevOps конференция 2025"
+    ];
+    
+    let newEventsCount = 0;
+    
+    try {
+      for (const query of queries) {
+        // Add a small delay to avoid hitting rate limits too hard
+        if (newEventsCount > 0) await new Promise(r => setTimeout(r, 1000));
+        
+        const result = await scrapeEventInformation(query);
+        if (result.success && result.event) {
+          // Check if exists
+          const exists = events.some(e => e.title === result.event!.title);
+          if (!exists) {
+             const newEvent = {
+               ...result.event,
+               id: 'ai-event-' + Date.now() + Math.random().toString(36).substr(2, 9),
+             } as Event;
+             
+             setEvents(prev => [newEvent, ...prev]);
+             newEventsCount++;
+          }
+        }
+      }
+      
+      if (newEventsCount > 0) {
+        toast.success(`Найдено и добавлено событий: ${newEventsCount}`);
+      } else {
+        toast.info("Новых событий не найдено");
+      }
+    } catch (error) {
+      console.error("Error updating events:", error);
+      toast.error("Ошибка при поиске событий");
+    } finally {
+      setIsUpdatingEvents(false);
+    }
+  };
 
   // Auth & Data Fetching
   useEffect(() => {
@@ -466,10 +515,6 @@ export default function App() {
                               {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
-                              <Clock className="w-4 h-4 text-blue-500" />
-                              {new Date(event.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
                               <MapPin className="w-4 h-4 text-blue-500" />
                               {event.location}
                             </div>
@@ -578,27 +623,61 @@ export default function App() {
 
             {/* All Events Grid */}
             <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 pl-2">Все мероприятия</h2>
-              {filteredEvents.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredEvents.map(event => (
-                    <EventCard 
-                      key={event.id} 
-                      event={event} 
-                      isRegistered={user?.myEventIds.includes(event.id)}
-                      onToggleRegister={toggleRegister}
-                      onClick={() => setSelectedEvent(event)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
-                   <div className="text-gray-400 mb-2">Ничего не найдено</div>
-                   <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setSortOrder('date_asc');}} className="text-blue-600">
-                     Сбросить фильтры
-                   </Button>
-                </div>
-              )}
+              <div className="flex items-center justify-between mb-6 pl-2 pr-2">
+                <h2 className="text-2xl font-bold text-slate-900">Все мероприятия</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleUpdateEvents}
+                  disabled={isUpdatingEvents}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isUpdatingEvents ? 'animate-spin' : ''}`} />
+                  {isUpdatingEvents ? 'Обновляем...' : 'Обновить события'}
+                </Button>
+              </div>
+              {(() => {
+                const displayEvents = events
+                  .filter(event => {
+                    const matchesSearch = event.title.toLowerCase().includes(search.toLowerCase()) || 
+                                          event.description.toLowerCase().includes(search.toLowerCase());
+                    const matchesCategory = categoryFilter === 'All' || event.category === categoryFilter;
+                    const matchesFormat = formatFilter === 'All' || event.format === formatFilter;
+                    
+                    return matchesSearch && matchesCategory && matchesFormat;
+                  })
+                  .sort((a, b) => {
+                      if (sortOrder === 'date_asc') {
+                          return new Date(a.date).getTime() - new Date(b.date).getTime();
+                      } else if (sortOrder === 'date_desc') {
+                          return new Date(b.date).getTime() - new Date(a.date).getTime();
+                      } else if (sortOrder === 'title_asc') {
+                          return a.title.localeCompare(b.title);
+                      }
+                      return 0;
+                  });
+
+                return displayEvents.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {displayEvents.map(event => (
+                      <EventCard 
+                        key={event.id} 
+                        event={event} 
+                        isRegistered={user?.myEventIds.includes(event.id)}
+                        onToggleRegister={toggleRegister}
+                        onClick={() => setSelectedEvent(event)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+                     <div className="text-gray-400 mb-2">Ничего не найдено</div>
+                     <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setSortOrder('date_asc');}} className="text-blue-600">
+                       Сбросить фильтры
+                     </Button>
+                  </div>
+                );
+              })()}
             </div>
 
           </div>

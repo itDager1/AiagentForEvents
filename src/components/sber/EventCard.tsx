@@ -44,10 +44,6 @@ export function EventCard({ event, isRegistered, onToggleRegister, onClick }: Ev
              <Calendar className="w-3.5 h-3.5" />
              {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
            </div>
-           <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-             <Clock className="w-3.5 h-3.5" />
-             {new Date(event.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-           </div>
         </div>
       </div>
       

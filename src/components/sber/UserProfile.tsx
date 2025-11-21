@@ -93,6 +93,60 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
+  const isWorkingDay = (date: Date, schedule?: WorkSchedule) => {
+    const day = date.getDay(); // 0 = Sun, 6 = Sat
+    
+    // Normalize date to midnight for accurate day difference calculation
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    switch (schedule) {
+      case '2/2': {
+        // Use user's start date or fallback to Jan 1, 2024
+        const refDate = user.scheduleStartDate ? new Date(user.scheduleStartDate) : new Date(2024, 0, 1);
+        refDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate.getTime() - refDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Cycle is 4 days: 2 work, 2 off
+        // We use module arithmetic to find position in cycle
+        const cycleDay = ((diffDays % 4) + 4) % 4;
+        return cycleDay < 2;
+      }
+      case '4/3': {
+         if (user.scheduleStartDate) {
+             const refDate = new Date(user.scheduleStartDate);
+             refDate.setHours(0, 0, 0, 0);
+             const diffTime = targetDate.getTime() - refDate.getTime();
+             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+             const cycleDay = ((diffDays % 7) + 7) % 7;
+             return cycleDay < 4; // 0, 1, 2, 3 are work days
+         }
+         // Default 4/3: Mon-Thu work, Fri-Sun off
+         return day >= 1 && day <= 4;
+      }
+      case '5/2':
+        // If user wants to shift 5/2, they can, otherwise standard Mon-Fri
+        if (user.scheduleStartDate) {
+             const refDate = new Date(user.scheduleStartDate);
+             refDate.setHours(0, 0, 0, 0);
+             const diffTime = targetDate.getTime() - refDate.getTime();
+             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+             const cycleDay = ((diffDays % 7) + 7) % 7;
+             return cycleDay < 5; // 0-4 work
+        }
+        return day !== 0 && day !== 6;
+      case 'Удаленка':
+      case 'Неполный день':
+      default:
+        return day !== 0 && day !== 6;
+      case 'Гибкий':
+      case 'Проектная':
+        return true;
+    }
+  };
+
   const renderCalendar = () => {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDay = getFirstDayOfMonth(currentDate);
@@ -100,12 +154,13 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
     
     // Empty cells for previous month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-32 bg-slate-50/50 border border-slate-100/50"></div>);
+      days.push(<div key={`empty-${i}`} className="h-32 bg-slate-50/30 border border-slate-100/50"></div>);
     }
 
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+      const isWorkDay = isWorkingDay(currentDayDate, user.schedule);
       
       const dayEvents = myEvents.filter(event => {
         const eventDate = new Date(event.date);
@@ -115,16 +170,28 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
       });
 
       days.push(
-        <div key={day} className="h-32 bg-white border border-slate-100 p-2 relative hover:bg-slate-50 transition-colors group overflow-hidden">
-          <span className={`text-sm font-medium ${
-            dayEvents.length > 0 ? 'text-slate-900' : 'text-slate-400'
-          } ${
-            new Date().toDateString() === currentDayDate.toDateString() 
-              ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full' 
-              : ''
-          }`}>
-            {day}
-          </span>
+        <div 
+            key={day} 
+            className={`h-32 border border-slate-100 p-2 relative transition-colors group overflow-hidden ${
+                isWorkDay ? 'bg-white hover:bg-blue-50/30' : 'bg-slate-50/60 hover:bg-slate-100/80'
+            }`}
+        >
+          <div className="flex justify-between items-start">
+            <span className={`text-sm font-medium ${
+                dayEvents.length > 0 ? 'text-slate-900' : isWorkDay ? 'text-slate-400' : 'text-slate-400/70'
+            } ${
+                new Date().toDateString() === currentDayDate.toDateString() 
+                ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full' 
+                : ''
+            }`}>
+                {day}
+            </span>
+            {!isWorkDay && (
+                <span className="text-[10px] text-slate-400 font-medium bg-slate-200/50 px-1.5 py-0.5 rounded">
+                    Вых
+                </span>
+            )}
+          </div>
           
           <div className="mt-2 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] no-scrollbar">
             {dayEvents.map(event => {
@@ -255,23 +322,52 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
                     <span className="text-sm font-medium text-slate-900">График работы</span>
                   </div>
                   {onUpdateUser ? (
-                    <Select value={user.schedule || ''} onValueChange={(v) => handleScheduleChange(v as WorkSchedule)}>
-                      <SelectTrigger className="w-full h-9 text-sm bg-slate-50 border-slate-200 focus:ring-blue-500/20">
-                        <SelectValue placeholder="Выберите график" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5/2">5/2 (Офис)</SelectItem>
-                        <SelectItem value="2/2">2/2 (Сменный)</SelectItem>
-                        <SelectItem value="4/3">4/3 (Четырехдневка)</SelectItem>
-                        <SelectItem value="Гибкий">Гибкий график</SelectItem>
-                        <SelectItem value="Удаленка">Удаленная работа</SelectItem>
-                        <SelectItem value="Неполный день">Неполный день</SelectItem>
-                        <SelectItem value="Проектная">Проектная работа</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-3">
+                        <Select value={user.schedule || ''} onValueChange={(v) => handleScheduleChange(v as WorkSchedule)}>
+                            <SelectTrigger className="w-full h-9 text-sm bg-slate-50 border-slate-200 focus:ring-blue-500/20">
+                                <SelectValue placeholder="Выберите график" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="5/2">5/2 (Офис)</SelectItem>
+                                <SelectItem value="2/2">2/2 (Сменный)</SelectItem>
+                                <SelectItem value="4/3">4/3 (Четырехдневка)</SelectItem>
+                                <SelectItem value="Гибкий">Гибкий график</SelectItem>
+                                <SelectItem value="Удаленка">Удаленная работа</SelectItem>
+                                <SelectItem value="Неполный день">Неполный день</SelectItem>
+                                <SelectItem value="Проектная">Проектная работа</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {(user.schedule === '2/2' || user.schedule === '4/3' || user.schedule === '5/2') && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-xs text-slate-500 font-medium ml-1">День начала смены / недели</label>
+                                <Input
+                                    type="date"
+                                    value={user.scheduleStartDate ? user.scheduleStartDate.split('T')[0] : ''}
+                                    onChange={(e) => {
+                                        onUpdateUser({ ...user, scheduleStartDate: e.target.value });
+                                    }}
+                                    className="h-9 text-sm bg-slate-50 border-slate-200 focus:ring-blue-500/20 w-full"
+                                />
+                                <p className="text-[10px] text-slate-400 px-1">
+                                    Выберите первый рабочий день цикла для корректного отображения в календаре
+                                </p>
+                            </div>
+                        )}
+                    </div>
                   ) : (
-                    <div className="text-sm text-slate-600 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-                      {user.schedule || 'Не указан'}
+                    <div className="flex flex-col gap-2">
+                        <div className="text-sm text-slate-600 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                        {user.schedule || 'Не указан'}
+                        </div>
+                        {user.scheduleStartDate && (['2/2', '4/3', '5/2'].includes(user.schedule || '')) && (
+                            <div className="text-xs text-slate-500 flex items-center gap-2 px-1">
+                                <span>Начало цикла:</span>
+                                <span className="font-medium text-slate-700">
+                                    {new Date(user.scheduleStartDate).toLocaleDateString('ru-RU')}
+                                </span>
+                            </div>
+                        )}
                     </div>
                   )}
                 </div>
@@ -393,6 +489,10 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-50 border border-red-200 rounded"></div>
               <span>✕ Отклонено</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-slate-50 border border-slate-200 rounded"></div>
+              <span>Выходной</span>
             </div>
           </div>
         </div>
