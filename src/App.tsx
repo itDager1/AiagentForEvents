@@ -567,7 +567,7 @@ export default function App() {
                                    </>
                                  ) : (
                                    <>
-                                     Записаться
+                                     За��исаться
                                      <ArrowRight className="w-4 h-4 ml-2" />
                                    </>
                                  )}
@@ -895,7 +895,22 @@ export default function App() {
               {/* Top Row - AI Button */}
               <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 mb-4">
                 <Button 
-                  onClick={handleAskAI}
+                  onClick={async () => {
+                    if (!user) {
+                      setIsAuthOpen(true);
+                      return;
+                    }
+                    setIsAiLoading(true);
+                    try {
+                      const recommendations = await getAIRecommendations(user, filteredEvents, '');
+                      setAiRecommendations(recommendations);
+                      toast.success("ИИ подобрал для вас мероприятия!");
+                    } catch (e) {
+                      toast.error("Ошибка при обращении к ИИ");
+                    } finally {
+                      setIsAiLoading(false);
+                    }
+                  }}
                   disabled={isAiLoading}
                   className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white border-none rounded-2xl px-8 h-14 shadow-lg shadow-blue-600/30 transition-all hover:shadow-blue-600/50 hover:scale-105 font-semibold text-base"
                 >
@@ -1026,6 +1041,7 @@ export default function App() {
                         loading: 'Обновление...',
                         success: 'Все актуальные события уже найдены',
                         error: 'Ошибка',
+                        duration: 3000,
                       }
                     );
                   }}
