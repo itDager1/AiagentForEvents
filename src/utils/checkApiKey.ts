@@ -15,38 +15,36 @@ export type ApiKeyStatus = {
 
 export async function checkApiKeyStatus(): Promise<ApiKeyStatus> {
   try {
-    const response = await fetch(`${BASE_URL}/seed-ai-events`, {
-      method: 'POST',
+    const response = await fetch(`${BASE_URL}/check-api-key`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${publicAnonKey}`
       }
     });
 
-    // 400 means API key is not configured (expected error)
-    if (response.status === 400) {
-      const data = await response.json();
-      return {
-        isConfigured: false,
-        message: 'OpenRouter API ключ не настроен',
-        details: data.message || 'Настройте OPENROUTER_API_KEY в Supabase Edge Functions Secrets'
-      };
-    }
-
-    // 200 means API key is configured
     if (response.ok) {
-      return {
-        isConfigured: true,
-        message: 'OpenRouter API ключ настроен корректно',
-        details: 'AI-функционал активен'
-      };
+      const data = await response.json();
+      if (data.isConfigured) {
+        return {
+          isConfigured: true,
+          message: 'OpenRouter API ключ настроен корректно',
+          details: 'AI-функционал активен'
+        };
+      } else {
+        return {
+          isConfigured: false,
+          message: 'OpenRouter API ключ не настроен',
+          details: 'Настройте OPENROUTER_API_KEY в Supabase Edge Functions Secrets'
+        };
+      }
     }
 
-    // Other errors
+    // Fallback to old method if new endpoint fails (e.g. outdated server)
     return {
-      isConfigured: false,
-      message: 'Ошибка при проверке API ключа',
-      details: `HTTP ${response.status}`
+        isConfigured: false,
+        message: 'Ошибка при проверке API ключа',
+        details: `HTTP ${response.status}`
     };
 
   } catch (error) {

@@ -143,7 +143,11 @@ export default function App() {
         if (session?.user) {
           const profile = await getUserProfile(session.user.id);
           if (profile) {
-            setUser(profile);
+            // Enforce admin rule: only admin@sberbank.ru is admin
+            const isRealAdmin = profile.email === 'admin@sberbank.ru';
+            const userWithCorrectRole = { ...profile, isAdmin: isRealAdmin };
+            
+            setUser(userWithCorrectRole);
             console.log(`👤 Пользователь: ${profile.name}`);
             
             // Load user registrations
@@ -166,7 +170,11 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await getUserProfile(session.user.id);
-        if (profile) setUser(profile);
+        if (profile) {
+            // Enforce admin rule
+            const isRealAdmin = profile.email === 'admin@sberbank.ru';
+            setUser({ ...profile, isAdmin: isRealAdmin });
+        } 
         setIsAuthOpen(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -210,7 +218,7 @@ export default function App() {
           email,
           interests: defaultInterests,
           myEventIds: [],
-          isAdmin: true // Mock users are admins for demo
+          isAdmin: email === 'admin@sberbank.ru' // Only admin@sberbank.ru is admin
       };
       setUser(newUser);
       setIsAuthOpen(false);
@@ -225,11 +233,15 @@ export default function App() {
           email,
           interests: defaultInterests,
           myEventIds: [],
-          isAdmin: true // Admin user
+          isAdmin: email === 'admin@sberbank.ru'
       };
       setUser(adminUser);
       setIsAuthOpen(false);
-      setView('admin'); // Automatically open admin panel
+      if (adminUser.isAdmin) {
+        setView('admin'); // Only open admin panel if actually admin
+      } else {
+        setView('catalog');
+      }
   };
 
   const handleRefreshRegistrations = async () => {
@@ -361,12 +373,7 @@ export default function App() {
         }} 
         onLoginClick={() => setIsAuthOpen(true)}
         onEventsClick={() => {
-          // Admin cannot navigate to events catalog
-          if (user?.isAdmin) {
-            setView('admin');
-          } else {
-            setView('catalog');
-          }
+          setView('catalog');
         }}
         onCalendarClick={() => {
           if (!user) {
@@ -376,7 +383,13 @@ export default function App() {
           handleRefreshRegistrations();
           setView('profile');
         }}
-        onAdminClick={() => setView('admin')}
+        onAdminClick={() => {
+          if (user?.isAdmin && user?.email === 'admin@sberbank.ru') {
+            setView('admin');
+          } else {
+            toast.error("Доступ только для администратора");
+          }
+        }}
       />
 
       <Auth 
@@ -432,12 +445,6 @@ export default function App() {
                      {user ? 'Развивайся с AI' : 'Найди события для роста'}
                    </span>
                  </h1>
-                 <p className="text-slate-500 text-lg mb-8 max-w-xl leading-relaxed">
-                   {user 
-                     ? `Я проанализировал твой профиль ${user.role}. Вместе мы найдем лучшие события.` 
-                     : 'Войдите в систему, чтобы получить персональные рекомендации от нашего ИИ.'
-                   }
-                 </p>
                  <div className="flex gap-4">
                    <Button 
                      onClick={handleAskAI}
@@ -562,7 +569,16 @@ export default function App() {
 
             {/* Filters Bar */}
             <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-gray-200/50 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-               <div className="flex items-center gap-2 w-full md:w-auto">
+               <div className="flex items-center gap-3 w-full md:w-auto">
+                 <Button 
+                   onClick={handleAskAI}
+                   disabled={isAiLoading}
+                   className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-xl px-6 h-11 shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 whitespace-nowrap"
+                 >
+                   {isAiLoading ? 'AI анализирует...' : (user ? 'Подобрать с AI' : 'Войти и подобрать')}
+                   <Sparkles className="ml-2 w-4 h-4" />
+                 </Button>
+                 <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
                  <div className="relative w-full md:w-72">
                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                    <Input 
@@ -582,7 +598,7 @@ export default function App() {
                    <SelectContent>
                      <SelectItem value="All">Все категории</SelectItem>
                      <SelectItem value="Обучение">Обучение</SelectItem>
-                     <SelectItem value="Хакатон">Хакатон</SelectItem>
+                     <SelectItem value="Хактн">Хакатон</SelectItem>
                      <SelectItem value="Митап">Митап</SelectItem>
                      <SelectItem value="Конференция">Конференция</SelectItem>
                    </SelectContent>

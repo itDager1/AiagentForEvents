@@ -253,9 +253,6 @@ export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) 
               
               {/* Admin Quick Login */}
               <div className="mt-6 pt-6 border-t border-gray-100">
-                <div className="text-center text-xs text-gray-500 mb-3">
-                  Быстрый вход для тестирования
-                </div>
                 {showAdminPasswordInput ? (
                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                     <div className="space-y-2">
@@ -317,9 +314,6 @@ export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) 
               </div>
             </Tabs>
           </CardContent>
-          <CardFooter className="text-center text-xs text-slate-400 justify-center pb-6">
-             Sber Tech &bull; 2025
-          </CardFooter>
         </Card>
       </DialogContent>
     </Dialog>

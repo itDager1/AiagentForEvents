@@ -9,6 +9,12 @@ const app = new Hono().basePath('/make-server-6f7662b1');
 // Enable logger
 app.use('*', logger(console.log));
 
+// Check API Key Endpoint (Lightweight)
+app.get('/check-api-key', async (c) => {
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+  return c.json({ isConfigured: !!apiKey });
+});
+
 // Enable CORS for all routes and methods
 app.use(
   "/*",
@@ -146,6 +152,165 @@ app.post('/signup', async (c) => {
       }
     });
     
+    // AI Search Endpoint (New)
+    app.post('/ai-search', async (c) => {
+      try {
+        const { query } = await c.req.json();
+        const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+    
+        if (!apiKey) {
+          return c.json({ error: 'OPENROUTER_API_KEY is not set' }, 500);
+        }
+
+        const prompt = `Найди актуальную информацию о следующем IT-мероприятии: "${query}"
+ 
+ Пожалуйста, верни информацию в формате JSON:
+ {
+   "title": "Точное название мероприятия (включая номер, если это митап)",
+   "description": "Подр��бное описание мероприятия (2-3 предложения)",
+   "date": "Дата начала в формате ISO (YYYY-MM-DDTHH:mm:ss)",
+   "displayDate": "Красиво отформатированная дата для отображения (например, '27–28 ноября 2025')",
+   "format": "Онлайн" | "Оффлайн" | "Гибрид",
+   "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
+   "location": "Место проведения",
+   "tags": ["тег1", "тег2", "тег3"],
+   "originalLink": "Официальный сайт мероприятия",
+   "partners": ["Название партнера 1", "Название партнера 2"]
+ }
+ 
+ ВАЖНО:
+ - Ищи ТОЛЬКО будущие мероприятия (дата после ${new Date().toISOString().split('T')[0]})
+ - Если название содержит номер (например, Moscow Python Meetup #90), ОБЯЗАТЕЛЬНО проверь, какой номер актуален сейчас. Не используй старые номера.
+ - Если мероприятие регулярное (митап), найди информацию именно о БЛИЖАЙШЕМ.
+ - Даты должны быть точными.
+ - Найди 3-5 ключевых п��ртнеров или спонсоров события.
+ - Если партнеры не найдены, верни пустой массив [].
+ - Если мероприятие не найдено или информация устарела, верни null.
+ - Формат даты ISO: YYYY-MM-DDTHH:mm:ss.
+ - Категория должна быть одной из: "Обучение", "Хакатон", "Митап", "Конференция".
+ - Формат должен быть одним из: "Онлайн", "Оффлайн", "Гибрид".
+ 
+ Верни ТОЛЬКО JSON объект или null, без дополнительного текста.`;
+    
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://figma-make.com", 
+            "X-Title": "Figma Make App"
+          },
+          body: JSON.stringify({
+            "model": "perplexity/sonar",
+            "messages": [
+              {"role": "system", "content": "Ты - эксперт по IT-мероприятиям. Ты находишь актуальную информацию о конференциях, хакатонах и митапах. Всегд�� возвращай валидный JSON с точными датами или null, если информация недоступна."},
+              {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 1000
+          })
+        });
+    
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter API Error: ${response.status} ${errText}`);
+        }
+    
+        const data = await response.json();
+        return c.json(data);
+    
+      } catch (error) {
+        console.error('AI Search Error:', error);
+        return c.json({ error: error.message }, 500);
+      }
+    });
+    
+    // AI Extract Endpoint (New)
+    app.post('/ai-extract', async (c) => {
+      try {
+        const { content, url } = await c.req.json();
+        const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+    
+        if (!apiKey) {
+          return c.json({ error: 'OPENROUTER_API_KEY is not set' }, 500);
+        }
+
+        const currentDate = new Date().toISOString().split('T')[0];
+        const prompt = `Ты - эксперт по извлечению информации о IT-мероприятиях с веб-сайтов.
+ 
+ ТЕКУЩАЯ ДАТА: ${currentDate}
+ 
+ Проанализируй содержимое следующей веб-страницы и извлеки ТОЧНУЮ информацию о мероприятии:
+ 
+ URL: ${url}
+ 
+ СОДЕРЖИМОЕ СТРАНИЦЫ:
+ ${content.substring(0, 5000)}
+ 
+ КРИТИЧЕСКИ ВАЖНО - ИЗВЛЕЧЕНИЕ ДАТ:
+ 1. Найди ТОЧНЫЕ даты проведения мероприятия на странице
+ 2. Обрати внимание на:
+    - Элементы <time> с атрибутами datetime
+    - Текст вида "27-28 ноября 2025" или "November 27-28, 2025"
+    - Блоки с классами типа .date, .event-date, .schedule
+    - Мета-теги с датами события
+ 3. Если видишь несколько дат (например, диапазон), используй дату НАЧАЛА мероприятия
+ 4. Убедись, что дата в будущем (после ${currentDate})
+ 5. Если мероприятие уже прошло - верни null
+ 
+ ФОРМАТ ДАТЫ:
+ - ISO формат: YYYY-MM-DDTHH:mm:ss
+ - Если время не указано, используй 10:00:00 для дневных событий
+ - Для онлайн-событий можно использовать 19:00:00
+ 
+ Верни JSON в следующем формате:
+ {
+   "title": "Точное официальное название мероприятия со страницы",
+   "description": "Краткое описаие из официального источника (2-3 предложения)",
+   "date": "YYYY-MM-DDTHH:mm:ss (ТОЧНАЯ дата начала)",
+   "displayDate": "Красивая дата для показа (например: '27–28 ноября 2025')",
+   "format": "Онлайн" | "Оффлайн" | "Гибрид",
+   "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
+   "location": "Точное место проведения",
+   "tags": ["тег1", "тег2", "тег3"],
+   "partners": ["Партнер 1", "Партнер 2"]
+ }
+ 
+ Верни ТОЛЬКО JSON объект или null, БЕЗ дополнительного текста или markdown.`;
+    
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://figma-make.com", 
+            "X-Title": "Figma Make App"
+          },
+          body: JSON.stringify({
+            "model": "perplexity/sonar",
+            "messages": [
+              {"role": "system", "content": "Ты - эксперт по извлечению структурированных данных о мероприятиях из HTML. Твоя главная задача - найти ТОЧНЫЕ даты с официальных сайтов. Ты ВСЕГДА проверяешь актуальность дат. Возвращай только валидный JSON с точными датами или null."},
+              {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 1500
+          })
+        });
+    
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter API Error: ${response.status} ${errText}`);
+        }
+    
+        const data = await response.json();
+        return c.json(data);
+    
+      } catch (error) {
+        console.error('AI Extract Error:', error);
+        return c.json({ error: error.message }, 500);
+      }
+    });
+
     // Seed AI Events Endpoint
     app.post('/seed-ai-events', async (c) => {
       try {

@@ -1,5 +1,8 @@
 import { Event } from '../data/mock';
 import { supabase } from './supabaseClient';
+import { projectId, publicAnonKey } from './supabase/info';
+
+const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-6f7662b1`;
 
 /**
  * Result type for event scraping operations
@@ -75,7 +78,7 @@ export function validateEventData(eventData: Partial<Event>): ValidationResult {
   }
 
   if (!eventData.format) {
-    errors.push('Формат мероприятия обязателен');
+    errors.push('Формат мероприятия обязателе��');
   }
 
   if (!eventData.category) {
@@ -101,92 +104,36 @@ export function validateEventData(eventData: Partial<Event>): ValidationResult {
  */
 async function searchEventByQuery(query: string): Promise<Partial<Event> | null> {
   try {
-    // Get the API key from Supabase secrets
-    const { data: secrets } = await supabase.rpc('get_secret', { secret_name: 'OPENROUTER_API_KEY' });
-    const apiKey = secrets;
-    
-    if (!apiKey) {
-      console.error('OpenRouter API key not configured');
-      throw new Error('API key not configured');
-    }
-    
-    const prompt = `Найди актуальную информацию о следующем IT-мероприятии: "${query}"
-
-Пожалуйста, верни информацию в формате JSON:
-{
-  "title": "Точное название мероприятия (включая номер, если это митап)",
-  "description": "Подробное описание мероприятия (2-3 предложения)",
-  "date": "Дата начала в формате ISO (YYYY-MM-DDTHH:mm:ss)",
-  "displayDate": "Красиво отформатированная дата для отображения (например, '27–28 ноября 2025')",
-  "format": "Онлайн" | "Оффлайн" | "Гибрид",
-  "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
-  "location": "Место проведения",
-  "tags": ["тег1", "тег2", "тег3"],
-  "originalLink": "Официальный сайт мероприятия",
-  "partners": ["Название партнера 1", "Название партнера 2"]
-}
-
-ВАЖНО:
-- щи ТОЛЬКО будущие мероприятия (дата после ${new Date().toISOString().split('T')[0]})
-- Если название содержит номер (например, Moscow Python Meetup #90), ОБЯЗАТЕЛЬНО проверь, какой номер актуален сейчас. Не используй старые номера.
-- Если мероприятие регулярное (митап), найди информацию именно о БЛИЖАЙШЕМ.
-- Даты должны быть точными.
-- Найди 3-5 ключевых партнеров или спонсоров события.
-- Если партнеры не найдены, верни пустой массив [].
-- Если мероприятие не найдено или информация устарела, верни null.
-- Формат даты ISO: YYYY-MM-DDTHH:mm:ss.
-- Категория должна быть одной из: "Обучение", "Хакатон", "Митап", "Конференция".
-- Формат должен быть одним из: "Онлайн", "Оффлайн", "Гибрид".
-
-Верни ТОЛЬКО JSON объект или null, без дополнительного текста.`;
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch(`${BASE_URL}/ai-search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Exact Direction Event Search'
+        'Authorization': `Bearer ${publicAnonKey}`
       },
-      body: JSON.stringify({
-        model: 'perplexity/sonar',
-        messages: [
-          {
-            role: 'system',
-            content: 'Ты - эксперт по IT-мероприятиям. Ты находишь актуальную информацию о конференциях, хакатонах и митапах. Всегда возвращай валидный JSON с точными датами или null, если информация недоступна.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 1000
-      })
+      body: JSON.stringify({ query })
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenRouter API error:', errorText);
-      throw new Error(`OpenRouter API error: ${response.status}`);
+      console.error('AI Search API error:', errorText);
+      throw new Error(`AI Search API error: ${response.status}`);
     }
     
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content.trim();
+    const aiResponse = await response.json();
     
-    // Check if response is null
-    if (aiResponse === 'null' || aiResponse === 'NULL') {
+    // Check if response is null or error
+    if (!aiResponse || aiResponse.error) {
       return null;
     }
     
-    // Parse the JSON response
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('No JSON found in AI response:', aiResponse);
-      return null;
+    let eventData = aiResponse;
+    if (aiResponse.choices) {
+        // If backend returned raw OpenRouter response
+        const content = aiResponse.choices[0].message.content;
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) eventData = JSON.parse(match[0]);
+        else return null;
     }
-    
-    const eventData = JSON.parse(jsonMatch[0]);
     
     // Validate the extracted data
     if (!eventData.title || !eventData.date) {
@@ -237,7 +184,7 @@ export async function scrapeEventFromUrl(url: string): Promise<Partial<Event> | 
       return null;
     }
     
-    // Use OpenRouter API to extract structured event data
+    // Use Backend API to extract structured event data
     const extractedData = await extractEventDataWithAI(pageContent, url);
     
     return extractedData;
@@ -294,129 +241,45 @@ async function fetchWebpageContent(url: string): Promise<string | null> {
 }
 
 /**
- * Uses OpenRouter API to extract structured event data from HTML content
+ * Uses Backend API to extract structured event data from HTML content
  */
 async function extractEventDataWithAI(htmlContent: string, originalUrl: string): Promise<Partial<Event> | null> {
   try {
-    // Get the API key from Supabase secrets
-    const { data: secrets } = await supabase.rpc('get_secret', { secret_name: 'OPENROUTER_API_KEY' });
-    const apiKey = secrets;
-    
-    if (!apiKey) {
-      console.error('OpenRouter API key not configured');
-      throw new Error('API key not configured');
-    }
-    
     // Clean the HTML to reduce token usage
     const cleanedContent = cleanHtmlContent(htmlContent);
     
-    // Extract current year for context
-    const currentYear = new Date().getFullYear();
-    const currentDate = new Date().toISOString().split('T')[0];
-    
-    const prompt = `Ты - эксперт по извлечению информации о IT-мероприятиях с веб-сайтов.
-
-ТЕКУЩАЯ ДАТА: ${currentDate}
-
-Проанализируй содержимое следующей веб-страницы и извлеки ТОЧНУЮ информацию о мероприятии:
-
-URL: ${originalUrl}
-
-СОДЕРЖИМОЕ СТРАНИЦЫ:
-${cleanedContent.substring(0, 5000)}
-
-КРИТИЧЕСКИ ВАЖНО - ИЗВЛЕЧЕНИЕ ДАТ:
-1. Найди ТОЧНЫЕ даты проведения мероприятия на странице
-2. Обрати внимание на:
-   - Элементы <time> с атрибутами datetime
-   - Текст вида "27-28 ноября 2025" или "November 27-28, 2025"
-   - Блоки с классами типа .date, .event-date, .schedule
-   - Мета-теги с датами события
-3. Если видишь несколько дат (например, диапазон), используй дату НАЧАЛА мероприятия
-4. Убедись, что дата в будущем (после ${currentDate})
-5. Если мероприятие уже прошло - верни null
-
-ФОРМАТ ДАТЫ:
-- ISO формат: YYYY-MM-DDTHH:mm:ss
-- Если время не указано, используй 10:00:00 для дневных событий
-- Для онлайн-событий можно использовать 19:00:00
-
-Верни JSON в следующем формате:
-{
-  "title": "Точное официальное название мероприятия со страницы",
-  "description": "Краткое описа��ие из официального источника (2-3 предложения)",
-  "date": "YYYY-MM-DDTHH:mm:ss (ТОЧНАЯ дата начала)",
-  "displayDate": "Красивая дата для показа (например: '27–28 ноября 2025')",
-  "format": "Онлайн" | "Оффлайн" | "Гибрид",
-  "category": "Обучение" | "Хакатон" | "Митап" | "Конференция",
-  "location": "Точное место проведения",
-  "tags": ["тег1", "тег2", "тег3"],
-  "partners": ["Партнер 1", "Партнер 2"]
-}
-
-ПРИМЕРЫ ПРАВИЛЬНОГО ИЗВЛЕЧЕНИЯ ДАТ:
-- "27-28 ноября 2025" → date: "2025-11-27T10:00:00", displayDate: "27–28 ноября 2025"
-- "15 декабря 2025, 18:00" → date: "2025-12-15T18:00:00", displayDate: "15 декабря 2025"
-- "20-21 October 2025" → date: "2025-10-20T10:00:00", displayDate: "20–21 октября 2025"
-
-ПРОВЕРКИ:
-✓ Дата должна быть по��ле ${currentDate}
-✓ Год должен быть ${currentYear} или позже
-✓ Формат ISO должен быть валидным
-✓ Если дата не найдена или прошла - верни null
-
-Верни ТОЛЬКО JSON объект или null, БЕЗ дополнительного текста или markdown.`;
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch(`${BASE_URL}/ai-extract`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Exact Direction Event Scraper'
+        'Authorization': `Bearer ${publicAnonKey}`
       },
-      body: JSON.stringify({
-        model: 'perplexity/sonar',
-        messages: [
-          {
-            role: 'system',
-            content: 'Ты - эксперт по извлечению структурированных данных о мероприятиях из HTML. Твоя главная задача - найти ТОЧНЫЕ даты с официальных сайтов. Ты ВСЕГДА проверяешь актуальность дат. Возвращай только валидный JSON с точными датами или null.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1, // Very low temperature for factual extraction
-        max_tokens: 1500
+      body: JSON.stringify({ 
+        content: cleanedContent,
+        url: originalUrl
       })
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenRouter API error:', errorText);
-      throw new Error(`OpenRouter API error: ${response.status}`);
+      console.error('AI Extract API error:', errorText);
+      throw new Error(`AI Extract API error: ${response.status}`);
     }
     
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content.trim();
+    const aiResponse = await response.json();
     
-    console.log('AI Response:', aiResponse);
-    
-    // Check if response is null
-    if (aiResponse === 'null' || aiResponse === 'NULL' || aiResponse.toLowerCase() === 'null') {
-      console.log('AI returned null - event not found or date is in the past');
+    if (!aiResponse || aiResponse.error) {
       return null;
     }
-    
-    // Parse the JSON response
-    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('No JSON found in AI response:', aiResponse);
-      return null;
+
+    let eventData = aiResponse;
+    if (aiResponse.choices) {
+        // If backend returned raw OpenRouter response
+        const content = aiResponse.choices[0].message.content;
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) eventData = JSON.parse(match[0]);
+        else return null;
     }
-    
-    const eventData = JSON.parse(jsonMatch[0]);
     
     // Validate the extracted data
     if (!eventData.title || !eventData.date) {
@@ -439,6 +302,7 @@ ${cleanedContent.substring(0, 5000)}
     }
     
     // Validate year is reasonable (current year or next 2 years)
+    const currentYear = new Date().getFullYear();
     const eventYear = eventDate.getFullYear();
     if (eventYear < currentYear || eventYear > currentYear + 2) {
       console.error('Event year seems incorrect:', eventYear);
@@ -562,7 +426,7 @@ function cleanHtmlContent(html: string): string {
 ${timeElements.length > 0 ? timeElements.join('\n') : 'Не найдено элементов <time>'}
 ${dateElements.length > 0 ? '\n' + dateElements.join('\n') : ''}
 
-=== СТРУКТУРИР��ВАННЫЕ ДАННЫЕ ===
+=== СТРУКТУРИРОВАННЫЕ ДАН��ЫЕ ===
 ${jsonLdData || 'Не найдено JSON-LD данных'}
 
 === ОСНОВНОЙ КОНТЕНТ ===
