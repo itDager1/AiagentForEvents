@@ -568,89 +568,71 @@ export default function App() {
             )}
 
             {/* Filters Bar */}
-            <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-gray-200/50 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-               <div className="flex items-center gap-3 w-full md:w-auto">
-                 <Button 
-                   onClick={handleAskAI}
-                   disabled={isAiLoading}
-                   className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-xl px-6 h-11 shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 whitespace-nowrap"
-                 >
-                   {isAiLoading ? 'AI анализирует...' : (user ? 'Подобрать с AI' : 'Войти и подобрать')}
-                   <Sparkles className="ml-2 w-4 h-4" />
-                 </Button>
-                 <div className="h-8 w-px bg-gray-200 hidden md:block"></div>
-                 <div className="relative w-full md:w-72">
-                   <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                   <Input 
-                     placeholder="Поиск мероприятий..." 
-                     className="pl-10 bg-gray-50 border-transparent focus:bg-white focus:border-blue-200 rounded-xl h-11 transition-all"
-                     value={search}
-                     onChange={(e) => setSearch(e.target.value)}
-                   />
-                 </div>
-               </div>
-               
-               <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                 <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
-                   <SelectTrigger className="w-[150px] rounded-xl border-transparent bg-gray-50 hover:bg-gray-100 h-11">
-                     <SelectValue placeholder="Категория" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="All">Все категории</SelectItem>
-                     <SelectItem value="Обучение">Обучение</SelectItem>
-                     <SelectItem value="Хактн">Хакатон</SelectItem>
-                     <SelectItem value="Митап">Митап</SelectItem>
-                     <SelectItem value="Конференция">Конференция</SelectItem>
-                   </SelectContent>
-                 </Select>
+            <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
+              {/* Top Row - AI Button */}
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 mb-4">
+                <Button 
+                  onClick={handleAskAI}
+                  disabled={isAiLoading}
+                  className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white border-none rounded-2xl px-8 h-14 shadow-lg shadow-blue-600/30 transition-all hover:shadow-blue-600/50 hover:scale-105 font-semibold text-base"
+                >
+                  {isAiLoading ? (
+                    <>
+                      <div className="w-5 h-5 mr-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      AI анализирует...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-3 w-5 h-5" />
+                      {user ? 'Подобрать с AI' : 'Войти и подобрать'}
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {/* Bottom Row - Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                  <Filter className="w-4 h-4" />
+                  Фильтры:
+                </div>
+                
+                <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+                  <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                    <div className="flex items-center gap-2">
+                      <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
+                      <SelectValue placeholder="Категория" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">Все категории</SelectItem>
+                    <SelectItem value="Обучение">Обучение</SelectItem>
+                    <SelectItem value="Хакатон">Хакатон</SelectItem>
+                    <SelectItem value="Митап">Митап</SelectItem>
+                    <SelectItem value="Конференция">Конференция</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                 <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
-                   <SelectTrigger className="w-[140px] rounded-xl border-transparent bg-gray-50 hover:bg-gray-100 h-11">
-                     <SelectValue placeholder="Формат" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="All">Любой формат</SelectItem>
-                     <SelectItem value="Онлайн">Онлайн</SelectItem>
-                     <SelectItem value="Оффлайн">Оффлайн</SelectItem>
-                   </SelectContent>
-                 </Select>
-
-                 <div className="h-8 w-px bg-gray-200 hidden md:block mx-2"></div>
-
-                 <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as any)}>
-                   <SelectTrigger className="w-[180px] rounded-xl border-transparent bg-gray-50 hover:bg-gray-100 h-11">
-                     <div className="flex items-center gap-2 truncate">
-                        <ArrowUpDown className="w-4 h-4 text-gray-500" />
-                        <span className="truncate">
-                          {sortOrder === 'date_asc' && 'Сначала новые'}
-                          {sortOrder === 'date_desc' && 'Сначала старые'}
-                          {sortOrder === 'title_asc' && 'По алфавиту'}
-                        </span>
-                     </div>
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="date_asc">Сначала новые</SelectItem>
-                     <SelectItem value="date_desc">Сначала старые</SelectItem>
-                     <SelectItem value="title_asc">По алфавиту</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
+                <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
+                  <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-500" />
+                      <SelectValue placeholder="Формат" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">Любой формат</SelectItem>
+                    <SelectItem value="Онлайн">Онлайн</SelectItem>
+                    <SelectItem value="Оффлайн">Оффлайн</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* All Events Grid */}
             <div>
               <div className="flex items-center justify-between mb-6 pl-2 pr-2">
                 <h2 className="text-2xl font-bold text-slate-900">Все мероприятия</h2>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleUpdateEvents}
-                  disabled={isUpdatingEvents}
-                  className="gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isUpdatingEvents ? 'animate-spin' : ''}`} />
-                  {isUpdatingEvents ? 'Обновляем...' : 'Обновить события'}
-                </Button>
               </div>
               {(() => {
                 const displayEvents = events
