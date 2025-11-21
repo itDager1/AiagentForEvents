@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Calendar, User as UserIcon, Menu, LogOut, LogIn, Shield } from 'lucide-react';
+import { Calendar, User as UserIcon, Menu, LogOut, LogIn, Shield } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -64,10 +64,6 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
           
           {user ? (
             <>
-              <Button variant="ghost" size="icon" className="rounded-full text-gray-500 hover:text-blue-600 hover:bg-blue-50">
-                <Bell className="w-5 h-5" />
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="rounded-full p-0 w-10 h-10 overflow-hidden border-2 border-white shadow-sm hover:border-blue-200 transition-all ring-1 ring-gray-100">
@@ -90,10 +86,6 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
                   <DropdownMenuItem onClick={onProfileClick} className="cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:text-blue-700">
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Мой профиль</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:text-blue-700">
-                    <Bell className="mr-2 h-4 w-4" />
-                    <span>Уведомления</span>
                   </DropdownMenuItem>
                   {user.isAdmin && onAdminClick && (
                     <>

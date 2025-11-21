@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, MapPin, ExternalLink, X, Building2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, ExternalLink, X, Building2, Check, ArrowRight } from 'lucide-react';
 import { Event } from '../../data/mock';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -16,14 +16,21 @@ interface EventDetailsModalProps {
   event: Event | null;
   isOpen: boolean;
   onClose: () => void;
+  isRegistered?: boolean;
+  onToggleRegister?: (eventId: string) => void;
 }
 
-export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
+export function EventDetailsModal({ event, isOpen, onClose, isRegistered = false, onToggleRegister }: EventDetailsModalProps) {
   if (!event) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+      <DialogContent hideCloseButton className="sm:max-w-[600px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{event.title}</DialogTitle>
+          <DialogDescription>{event.description}</DialogDescription>
+        </DialogHeader>
+        
         <div className="relative h-64 w-full">
           <ImageWithFallback 
             src={event.image} 
@@ -64,11 +71,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         </div>
         
         <div className="p-6 bg-white space-y-6 max-h-[60vh] overflow-y-auto">
-            <DialogHeader className="hidden">
-                <DialogTitle>{event.title}</DialogTitle>
-                <DialogDescription>{event.description}</DialogDescription>
-            </DialogHeader>
-
             <div className="flex flex-wrap gap-3">
                 <Badge variant="outline" className="text-slate-600 border-slate-200 py-1.5 px-3 text-sm font-normal bg-slate-50">
                     {event.format}
@@ -157,6 +159,24 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     >
                         Перейти на сайт
                         <ExternalLink className="ml-2 w-4 h-4" />
+                    </Button>
+                )}
+                {onToggleRegister && (
+                    <Button 
+                        className="hidden sm:flex bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-600/20 px-6"
+                        onClick={() => onToggleRegister(event.id)}
+                    >
+                        {isRegistered ? (
+                            <>
+                                <Check className="mr-2 w-4 h-4" />
+                                Зарегистрирован
+                            </>
+                        ) : (
+                            <>
+                                <ArrowRight className="mr-2 w-4 h-4" />
+                                Зарегистрироваться
+                            </>
+                        )}
                     </Button>
                 )}
             </div>

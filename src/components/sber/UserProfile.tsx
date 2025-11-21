@@ -371,65 +371,10 @@ export function UserProfile({ user, myEvents, userRegistrations, onBack, onUpdat
                     </div>
                   )}
                 </div>
-
-                {/* Interests */}
-                <div className="pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-bold uppercase text-slate-400 tracking-wider">Интересы</p>
-                    {onUpdateUser && !isAddingInterest && (
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => setIsAddingInterest(true)}
-                            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                            <Plus className="w-3 h-3 mr-1" />
-                            Добавить
-                        </Button>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {user.interests.length > 0 ? (
-                      user.interests.map(tag => (
-                        <Badge key={tag} className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-none font-medium pr-1.5 gap-1 group/badge">
-                          {tag}
-                          {onUpdateUser && (
-                              <button 
-                                onClick={() => handleRemoveInterest(tag)}
-                                className="w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center transition-colors opacity-60 group-hover/badge:opacity-100"
-                              >
-                                  <X className="w-2.5 h-2.5" />
-                              </button>
-                          )}
-                        </Badge>
-                      ))
-                    ) : (
-                      !isAddingInterest && <p className="text-sm text-slate-400 italic">Интересы не указаны</p>
-                    )}
-                    
-                    {isAddingInterest && (
-                        <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in zoom-in-95 duration-200">
-                            <Input
-                                value={newInterest}
-                                onChange={(e) => setNewInterest(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Например: Java"
-                                className="h-7 text-sm w-32"
-                                autoFocus
-                            />
-                            <Button size="sm" onClick={handleAddInterest} className="h-7 px-2 bg-blue-600 hover:bg-blue-700 text-white">
-                                <Plus className="w-3 h-3" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setIsAddingInterest(false)} className="h-7 px-2">
-                                <X className="w-3 h-3" />
-                            </Button>
-                        </div>
-                    )}
-                  </div>
-                </div>
               </div>
-            </CardContent>
+
+                {/* Interests section removed */}
+              </CardContent>
           </Card>
         </div>
 

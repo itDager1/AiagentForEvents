@@ -20,7 +20,7 @@ function saveLocalRegistrations(registrations: EventRegistration[]) {
   }
 }
 
-export function createLocalRegistration(userId: string, eventId: string): EventRegistration {
+export function createLocalRegistration(userId: string, eventId: string, userEmail?: string): EventRegistration {
   const registrations = getLocalRegistrations();
   
   // Check if already exists
@@ -32,11 +32,14 @@ export function createLocalRegistration(userId: string, eventId: string): EventR
     return existing;
   }
   
+  // Auto-approve for admin users
+  const isAdmin = userEmail === 'admin@sberbank.ru';
+  
   const newRegistration: EventRegistration = {
     id: `reg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     userId,
     eventId,
-    status: 'pending',
+    status: isAdmin ? 'approved' : 'pending',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

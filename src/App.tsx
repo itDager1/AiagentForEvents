@@ -12,7 +12,7 @@ import { getAIRecommendations } from './utils/aiService';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
 import { Input } from './components/ui/input';
-import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown, Shield, RefreshCw, Search as SearchIcon } from 'lucide-react';
+import { Bot, Sparkles, Filter, Calendar, Clock, MapPin, ArrowRight, Check, ArrowUpDown, Shield, RefreshCw, Search as SearchIcon, ChevronDown, Monitor, ClipboardList } from 'lucide-react';
 import { Badge } from './components/ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Toaster } from 'sonner@2.0.3';
@@ -47,9 +47,16 @@ export default function App() {
   
   // Filters
   const [search, setSearch] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<EventCategory | 'All'>('All');
   const [formatFilter, setFormatFilter] = useState<'All' | 'Онлайн' | 'Оффлайн'>('All');
   const [sortOrder, setSortOrder] = useState<'date_asc' | 'date_desc' | 'title_asc'>('date_asc');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+
+  // Date input refs
+  const dateFromRef = React.useRef<HTMLInputElement>(null);
+  const dateToRef = React.useRef<HTMLInputElement>(null);
 
   // AI State
   const [aiRecommendations, setAiRecommendations] = useState<Event[]>([]);
@@ -61,10 +68,11 @@ export default function App() {
     toast.info("Ищу новые события в интернете...");
     
     const queries = [
-      "Крупная IT конференция 2025 Россия",
-      "Frontend митап Москва 2025",
-      "Хакатон по искусственному интеллекту 2025",
-      "DevOps конференция 2025"
+      "Крупная IT конференция 2026 Россия",
+      "Frontend митап Москва 2026",
+      "Хакатон по искусственному интеллекту 2026",
+      "DevOps конференция 2026",
+      "IT события декабрь 2025"
     ];
     
     let newEventsCount = 0;
@@ -301,10 +309,25 @@ export default function App() {
     }
     
     // Create new registration request
-    const registration = await createRegistration(user.id, eventId);
+    const registration = await createRegistration(user.id, eventId, user.email);
     if (registration) {
       setUserRegistrations(prev => [...prev, registration]);
-      toast.success("Заявка отправлена! Ожидайте одобрения администратора.");
+      
+      // Check if user is admin
+      if (user.email === 'admin@sberbank.ru') {
+        // Auto-approved for admin
+        toast.success("Вы записаны на мероприятие!");
+        
+        // Update user's myEventIds for immediate UI update
+        const updatedUser = {
+          ...user,
+          myEventIds: [...user.myEventIds, eventId]
+        };
+        setUser(updatedUser);
+        await createUserProfile(updatedUser);
+      } else {
+        toast.success("Заявка отправлена! Ожидайте одобрения администратора.");
+      }
     } else {
       toast.error("Ошибка при отправке заявки");
     }
@@ -341,7 +364,21 @@ export default function App() {
       const matchesCategory = categoryFilter === 'All' || event.category === categoryFilter;
       const matchesFormat = formatFilter === 'All' || event.format === formatFilter;
       
-      return matchesSearch && matchesCategory && matchesFormat;
+      // Date filtering
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+        const eventDate = new Date(event.date);
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          matchesDate = matchesDate && eventDate >= fromDate;
+        }
+        if (dateTo) {
+          const toDate = new Date(dateTo);
+          matchesDate = matchesDate && eventDate <= toDate;
+        }
+      }
+      
+      return matchesSearch && matchesCategory && matchesFormat && matchesDate;
     })
     .sort((a, b) => {
         if (sortOrder === 'date_asc') {
@@ -399,7 +436,22 @@ export default function App() {
         onAdminLogin={handleAdminLogin}
       />
       
-      <main className="flex-1 container mx-auto px-4 py-8">
+      {/* Admin Panel Toggle Bar - shown only for admin */}
+      {user?.isAdmin && user?.email === 'admin@sberbank.ru' && (
+        <div 
+          className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 cursor-pointer hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg"
+          onClick={() => setView(view === 'admin' ? 'catalog' : 'admin')}
+        >
+          <div className="container mx-auto flex items-center justify-center gap-2">
+            <Shield className="w-4 h-4" />
+            <span className="text-sm font-medium">
+              {view === 'admin' ? 'Закрыть панель администратора' : 'Открыть панель администратора'}
+            </span>
+          </div>
+        </div>
+      )}
+      
+      <main className={`flex-1 container mx-auto px-4 py-8 ${user?.isAdmin && user?.email === 'admin@sberbank.ru' ? 'mt-10' : ''}`}>
         {view === 'profile' && user ? (
           <UserProfile 
             user={user} 
@@ -415,13 +467,298 @@ export default function App() {
             onUpdateUser={handleUpdateUser}
           />
         ) : view === 'admin' ? (
-          <AdminPanel 
-            user={user} 
-            onBack={() => setView('catalog')} 
-            events={events}
-            userRegistrations={userRegistrations}
-            onRegistrationsUpdate={handleRefreshRegistrations}
-          />
+          <>
+            {/* Keep showing catalog in the background */}
+            <div className="space-y-10">
+              
+              {/* API Key Setup Notice */}
+              <ApiKeySetupNotice 
+                isConfigured={apiKeyConfigured}
+                isChecking={isCheckingApiKey}
+                onRecheck={handleRecheckApiKey}
+              />
+              
+              {/* AI Recommendations Section (List View) */}
+              {aiRecommendations.length > 0 && (
+                <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-6">
+                  <div className="flex items-center gap-3 pl-2">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">Персональные рекомендации</h2>
+                      <p className="text-slate-500 text-sm">Подобрано специально для вас на основе ваших интересов и графика</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {aiRecommendations.map((event, index) => {
+                      const isRegistered = user?.myEventIds.includes(event.id);
+                      return (
+                        <div 
+                          key={event.id} 
+                          onClick={() => setSelectedEvent(event)}
+                          className="group bg-white rounded-3xl p-5 border border-blue-100 shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col md:flex-row gap-6 cursor-pointer"
+                          style={{ animationDelay: `${index * 100}ms` }}
+                        >
+                          {/* Image Section */}
+                          <div className="w-full md:w-64 h-48 shrink-0 relative rounded-2xl overflow-hidden">
+                            <ImageWithFallback 
+                              src={event.image} 
+                              alt={event.title} 
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            />
+                            <div className="absolute top-3 left-3">
+                              <Badge className="bg-white/95 text-slate-900 backdrop-blur-md shadow-sm border-none">
+                                {event.category}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Content Section */}
+                          <div className="flex-1 flex flex-col">
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight">
+                                {event.title}
+                              </h3>
+                              <Badge variant="outline" className="shrink-0 hidden sm:flex bg-slate-50">
+                                {event.format}
+                              </Badge>
+                            </div>
+
+                            <p className="text-slate-600 leading-relaxed mb-4 line-clamp-3">
+                              {event.description}
+                            </p>
+
+                            <div className="flex flex-wrap gap-3 mb-6">
+                              <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                                <Calendar className="w-4 h-4 text-blue-500" />
+                                {event.displayDate || new Date(event.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                                <MapPin className="w-4 h-4 text-blue-500" />
+                                {event.location}
+                              </div>
+                            </div>
+
+                            <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-50">
+                               <div className="flex flex-wrap gap-2">
+                                 {event.tags.slice(0, 3).map(tag => (
+                                   <span key={tag} className="text-xs font-medium text-slate-400">#{tag}</span>
+                                 ))}
+                               </div>
+                               
+                               <Button 
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   toggleRegister(event.id);
+                                 }}
+                                 variant={isRegistered ? "outline" : "default"}
+                                 className={`rounded-xl transition-all ${
+                                   isRegistered 
+                                     ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800' 
+                                     : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20'
+                                 }`}
+                               >
+                                 {isRegistered ? (
+                                   <>
+                                     <Check className="w-4 h-4 mr-2" />
+                                     Вы записаны
+                                   </>
+                                 ) : (
+                                   <>
+                                     Записаться
+                                     <ArrowRight className="w-4 h-4 ml-2" />
+                                   </>
+                                 )}
+                               </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Filters Bar */}
+              <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
+                {/* Welcome Header */}
+                <div className="mb-6">
+                  <h1 className="text-3xl font-bold text-slate-900">Добро пожаловать!</h1>
+                </div>
+                
+                {/* Top Row - AI Button */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 mb-4">
+                  <Button 
+                    onClick={handleAskAI}
+                    disabled={isAiLoading}
+                    className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white border-none rounded-2xl px-8 h-14 shadow-lg shadow-blue-600/30 transition-all hover:shadow-blue-600/50 hover:scale-105 font-semibold text-base"
+                  >
+                    {isAiLoading ? (
+                      <>
+                        <div className="w-5 h-5 mr-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        AI анализирует...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-3 w-5 h-5" />
+                        {user ? 'Подобрать с AI' : 'Войти и подобрать'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+                
+                {/* Bottom Row - Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                    <Filter className="w-4 h-4" />
+                    Фильтры:
+                  </div>
+                  
+                  <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+                    <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                      <div className="flex items-center gap-2">
+                        <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
+                        <SelectValue placeholder="Категория" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">Все категории</SelectItem>
+                      <SelectItem value="Обучение">Обучение</SelectItem>
+                      <SelectItem value="Хакатон">Хакатон</SelectItem>
+                      <SelectItem value="Митап">Митап</SelectItem>
+                      <SelectItem value="Конференция">Конференция</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
+                    <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                      <div className="flex items-center gap-2">
+                        <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
+                        <SelectValue placeholder="Формат" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">Любой формат</SelectItem>
+                      <SelectItem value="Онлайн">Онлайн</SelectItem>
+                      <SelectItem value="Оффлайн">Оффлайн</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Calendar 
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 cursor-pointer z-10" 
+                        onClick={() => dateFromRef.current?.showPicker?.()}
+                      />
+                      <Input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        onInput={(e) => {
+                          const input = e.target as HTMLInputElement;
+                          const parts = input.value.split('-');
+                          if (parts[0] && parts[0].length > 4) {
+                            parts[0] = parts[0].slice(0, 4);
+                            input.value = parts.join('-');
+                          }
+                        }}
+                        max="9999-12-31"
+                        className="rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium pl-10 cursor-pointer"
+                        placeholder="От"
+                        ref={dateFromRef}
+                      />
+                    </div>
+                    <span className="text-gray-400">—</span>
+                    <div className="relative">
+                      <Calendar 
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 cursor-pointer z-10" 
+                        onClick={() => dateToRef.current?.showPicker?.()}
+                      />
+                      <Input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        onInput={(e) => {
+                          const input = e.target as HTMLInputElement;
+                          const parts = input.value.split('-');
+                          if (parts[0] && parts[0].length > 4) {
+                            parts[0] = parts[0].slice(0, 4);
+                            input.value = parts.join('-');
+                          }
+                        }}
+                        max="9999-12-31"
+                        className="rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium pl-10 cursor-pointer"
+                        placeholder="До"
+                        ref={dateToRef}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* All Events Grid */}
+              <div>
+                <div className="flex items-center justify-between mb-6 pl-2 pr-2">
+                  <h2 className="text-2xl font-bold text-slate-900">Все мероприятия</h2>
+                </div>
+                {(() => {
+                  const displayEvents = events
+                    .filter(event => {
+                      const matchesSearch = event.title.toLowerCase().includes(search.toLowerCase()) || 
+                                            event.description.toLowerCase().includes(search.toLowerCase());
+                      const matchesCategory = categoryFilter === 'All' || event.category === categoryFilter;
+                      const matchesFormat = formatFilter === 'All' || event.format === formatFilter;
+                      
+                      return matchesSearch && matchesCategory && matchesFormat;
+                    })
+                    .sort((a, b) => {
+                        if (sortOrder === 'date_asc') {
+                            return new Date(a.date).getTime() - new Date(b.date).getTime();
+                        } else if (sortOrder === 'date_desc') {
+                            return new Date(b.date).getTime() - new Date(a.date).getTime();
+                        } else if (sortOrder === 'title_asc') {
+                            return a.title.localeCompare(b.title);
+                        }
+                        return 0;
+                    });
+
+                  return displayEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {displayEvents.map(event => (
+                        <EventCard 
+                          key={event.id} 
+                          event={event} 
+                          isRegistered={user?.myEventIds.includes(event.id)}
+                          onToggleRegister={toggleRegister}
+                          onClick={() => setSelectedEvent(event)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+                       <div className="text-gray-400 mb-2">Ничего не найдено</div>
+                       <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setDateFrom(''); setDateTo(''); setSortOrder('date_asc');}} className="text-blue-600">
+                         Сбросить фильтры
+                       </Button>
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+            
+            {/* Admin Panel as Sheet Overlay */}
+            <AdminPanel 
+              user={user} 
+              onBack={() => setView('catalog')} 
+              events={events}
+              userRegistrations={userRegistrations}
+              onRegistrationsUpdate={handleRefreshRegistrations}
+              isOpen={true}
+            />
+          </>
         ) : (
           <div className="space-y-10">
             
@@ -432,46 +769,18 @@ export default function App() {
               onRecheck={handleRecheckApiKey}
             />
             
-            {/* AI Assistant Banner */}
-            <div className="bg-white rounded-3xl p-8 md:p-10 relative overflow-hidden shadow-sm border border-blue-100">
-              <div className="relative z-10 max-w-3xl">
-                 <div className="flex items-center gap-2 text-blue-600 font-bold mb-3 uppercase tracking-wider text-xs">
-                   <Sparkles className="w-4 h-4" />
-                   <span>AI-АГЕНТ</span>
-                 </div>
-                 <h1 className="text-3xl md:text-5xl font-bold mb-6 text-slate-900 leading-tight">
-                   {user ? `Привет, ${user.name}!` : 'Добро пожаловать!'} <br/>
-                   <span className="text-blue-600">
-                     {user ? 'Развивайся с AI' : 'Найди события для роста'}
-                   </span>
-                 </h1>
-                 <div className="flex gap-4">
-                   <Button 
-                     onClick={handleAskAI}
-                     disabled={isAiLoading}
-                     className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-full px-8 h-14 text-lg font-medium shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 font-[ABeeZee] text-[16px]"
-                   >
-                     {isAiLoading ? (
-                       <>
-                         <div className="w-5 h-5 mr-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                         AI анализирует...
-                       </>
-                     ) : (
-                       <>
-                         <Sparkles className="mr-3 w-5 h-5" />
-                         {user ? 'Подобрать с AI' : 'Войти и подобрать'}
-                       </>
-                     )}
-                   </Button>
-                 </div>
+            {/* Admin Applications Button - Only visible for admin */}
+            {user?.isAdmin && user?.email === 'admin@sberbank.ru' && (
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-3xl border-2 border-purple-200 shadow-lg">
+                <Button 
+                  onClick={() => setView('admin')}
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-none rounded-2xl px-8 h-16 shadow-lg shadow-purple-600/30 transition-all hover:shadow-purple-600/50 hover:scale-105 font-semibold text-lg"
+                >
+                  <ClipboardList className="mr-3 w-6 h-6" />
+                  Заявки
+                </Button>
               </div>
-              
-              {/* Decorative background elements */}
-              <div className="absolute right-0 top-0 h-full w-1/2 pointer-events-none">
-                 <div className="absolute top-10 right-10 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl"></div>
-                 <div className="absolute bottom-10 right-40 w-80 h-80 bg-purple-400/20 rounded-full blur-3xl"></div>
-              </div>
-            </div>
+            )}
 
             {/* AI Recommendations Section (List View) */}
             {aiRecommendations.length > 0 && (
@@ -481,7 +790,7 @@ export default function App() {
                     <Sparkles className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Персональные рекомендации</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">Пер��ональные рекомендации</h2>
                     <p className="text-slate-500 text-sm">Подобрано специально для вас на основе ваших интересов и графика</p>
                   </div>
                 </div>
@@ -578,6 +887,11 @@ export default function App() {
 
             {/* Filters Bar */}
             <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
+              {/* Welcome Header */}
+              <div className="mb-6">
+                <h1 className="text-3xl font-bold text-slate-900">Добро пожаловать!</h1>
+              </div>
+              
               {/* Top Row - AI Button */}
               <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 mb-4">
                 <Button 
@@ -601,40 +915,99 @@ export default function App() {
               
               {/* Bottom Row - Filters */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                <Button 
+                  onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                  variant="ghost" 
+                  className="flex items-center gap-2 text-sm font-semibold text-gray-600 uppercase tracking-wide hover:bg-blue-50 hover:text-blue-600 transition-all"
+                >
                   <Filter className="w-4 h-4" />
-                  Фильтры:
-                </div>
+                  Фильтры
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isFiltersOpen ? 'rotate-180' : ''}`} />
+                </Button>
                 
-                <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
-                  <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
-                    <div className="flex items-center gap-2">
-                      <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
-                      <SelectValue placeholder="Категория" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">Все категории</SelectItem>
-                    <SelectItem value="Обучение">Обучение</SelectItem>
-                    <SelectItem value="Хакатон">Хакатон</SelectItem>
-                    <SelectItem value="Митап">Митап</SelectItem>
-                    <SelectItem value="Конференция">Конференция</SelectItem>
-                  </SelectContent>
-                </Select>
+                {isFiltersOpen && (
+                  <div className="flex flex-wrap items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
+                    <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+                      <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                        <div className="flex items-center gap-2">
+                          <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
+                          <SelectValue placeholder="Категория" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">Все категории</SelectItem>
+                        <SelectItem value="Обучение">Обучение</SelectItem>
+                        <SelectItem value="Хакатон">Хакатон</SelectItem>
+                        <SelectItem value="Митап">Митап</SelectItem>
+                        <SelectItem value="Конференция">Конференция</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
-                  <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                    <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as any)}>
+                      <SelectTrigger className="min-w-[160px] rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium">
+                        <div className="flex items-center gap-2">
+                          <Badge className="w-2 h-2 rounded-full bg-blue-500 p-0"></Badge>
+                          <SelectValue placeholder="Формат" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">Любой формат</SelectItem>
+                        <SelectItem value="Онлайн">Онлайн</SelectItem>
+                        <SelectItem value="Оффлайн">Оффлайн</SelectItem>
+                      </SelectContent>
+                    </Select>
+
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <SelectValue placeholder="Формат" />
+                      <div className="relative">
+                        <Calendar 
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 cursor-pointer z-10" 
+                          onClick={() => dateFromRef.current?.showPicker?.()}
+                        />
+                        <Input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => setDateFrom(e.target.value)}
+                          onInput={(e) => {
+                            const input = e.target as HTMLInputElement;
+                            const parts = input.value.split('-');
+                            if (parts[0] && parts[0].length > 4) {
+                              parts[0] = parts[0].slice(0, 4);
+                              input.value = parts.join('-');
+                            }
+                          }}
+                          max="9999-12-31"
+                          className="rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium pl-10 cursor-pointer"
+                          placeholder="От"
+                          ref={dateFromRef}
+                        />
+                      </div>
+                      <span className="text-gray-400">—</span>
+                      <div className="relative">
+                        <Calendar 
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 cursor-pointer z-10" 
+                          onClick={() => dateToRef.current?.showPicker?.()}
+                        />
+                        <Input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => setDateTo(e.target.value)}
+                          onInput={(e) => {
+                            const input = e.target as HTMLInputElement;
+                            const parts = input.value.split('-');
+                            if (parts[0] && parts[0].length > 4) {
+                              parts[0] = parts[0].slice(0, 4);
+                              input.value = parts.join('-');
+                            }
+                          }}
+                          max="9999-12-31"
+                          className="rounded-xl border-2 border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50 h-12 transition-all font-medium pl-10 cursor-pointer"
+                          placeholder="До"
+                          ref={dateToRef}
+                        />
+                      </div>
                     </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">Любой формат</SelectItem>
-                    <SelectItem value="Онлайн">Онлайн</SelectItem>
-                    <SelectItem value="Оффлайн">Оффлайн</SelectItem>
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -642,6 +1015,24 @@ export default function App() {
             <div>
               <div className="flex items-center justify-between mb-6 pl-2 pr-2">
                 <h2 className="text-2xl font-bold text-slate-900">Все мероприятия</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={() => {
+                    toast.promise(
+                      new Promise((resolve) => setTimeout(resolve, 2000)),
+                      {
+                        loading: 'Обновление...',
+                        success: 'Все актуальные события уже найдены',
+                        error: 'Ошибка',
+                      }
+                    );
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Обновить
+                </Button>
               </div>
               {(() => {
                 const displayEvents = events
@@ -679,7 +1070,7 @@ export default function App() {
                 ) : (
                   <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
                      <div className="text-gray-400 mb-2">Ничего не найдено</div>
-                     <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setSortOrder('date_asc');}} className="text-blue-600">
+                     <Button variant="link" onClick={() => {setSearch(''); setCategoryFilter('All'); setFormatFilter('All'); setDateFrom(''); setDateTo(''); setSortOrder('date_asc');}} className="text-blue-600">
                        Сбросить фильтры
                      </Button>
                   </div>
@@ -698,6 +1089,8 @@ export default function App() {
         event={selectedEvent} 
         isOpen={!!selectedEvent} 
         onClose={() => setSelectedEvent(null)} 
+        isRegistered={selectedEvent ? user?.myEventIds.includes(selectedEvent.id) : false}
+        onToggleRegister={toggleRegister}
       />
     </div>
   );

@@ -79,10 +79,28 @@ export async function fetchEvents(): Promise<Event[]> {
   const response = await fetchAPI('/events');
   const events = response?.data;
   
-  if (events && Array.isArray(events) && events.length > 0) {
-      return events;
-  }
-  return MOCK_EVENTS;
+  // Always merge MOCK_EVENTS to ensure hardcoded future events (like Spring 2026) appear
+  // even if the DB is seeded with older data
+  const dbEvents = (events && Array.isArray(events)) ? events : [];
+  const eventMap = new Map<string, Event>();
+  
+  // Add DB events first
+  dbEvents.forEach((e: Event) => eventMap.set(e.id, e));
+  
+  // Add missing MOCK_EVENTS
+  MOCK_EVENTS.forEach(e => {
+      if (!eventMap.has(e.id)) {
+          eventMap.set(e.id, e);
+      }
+  });
+  
+  const now = new Date();
+  const allEvents = Array.from(eventMap.values());
+  
+  // Filter out past events and sort by date
+  return allEvents
+    .filter(e => new Date(e.date) > now)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 export async function getUserProfile(userId: string): Promise<User | null> {
@@ -141,9 +159,9 @@ export async function toggleRegistration(userId: string, eventId: string, isRegi
 }
 
 // New Registration System with Approval (with localStorage fallback)
-export async function createRegistration(userId: string, eventId: string): Promise<EventRegistration | null> {
+export async function createRegistration(userId: string, eventId: string, userEmail?: string): Promise<EventRegistration | null> {
   // Always use localStorage for now (until backend is deployed)
-  return createLocalRegistration(userId, eventId);
+  return createLocalRegistration(userId, eventId, userEmail);
 }
 
 export async function getUserRegistrations(userId: string): Promise<EventRegistration[]> {
