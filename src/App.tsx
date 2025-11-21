@@ -449,10 +449,19 @@ export default function App() {
                    <Button 
                      onClick={handleAskAI}
                      disabled={isAiLoading}
-                     className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-full px-8 h-14 text-lg font-medium shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40"
+                     className="bg-blue-600 hover:bg-blue-700 text-white border-none rounded-full px-8 h-14 text-lg font-medium shadow-lg shadow-blue-600/20 transition-all hover:shadow-blue-600/40 font-[ABeeZee] text-[16px]"
                    >
-                     {isAiLoading ? 'AI анализирует...' : (user ? 'Подобрать с AI' : 'Войти и подобрать')}
-                     <Sparkles className="ml-2 w-5 h-5" />
+                     {isAiLoading ? (
+                       <>
+                         <div className="w-5 h-5 mr-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                         AI анализирует...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="mr-3 w-5 h-5" />
+                         {user ? 'Подобрать с AI' : 'Войти и подобрать'}
+                       </>
+                     )}
                    </Button>
                  </div>
               </div>

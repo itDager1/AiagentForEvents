@@ -2120,6 +2120,10 @@
     vertical-align: middle;
   }
 
+  .font-\[ABeeZee\] {
+    font-family: ABeeZee;
+  }
+
   .font-sans {
     font-family: var(--font-sans);
   }
@@ -2169,6 +2173,10 @@
 
   .text-\[11px\] {
     font-size: 11px;
+  }
+
+  .text-\[16px\] {
+    font-size: 16px;
   }
 
   .leading-none {
