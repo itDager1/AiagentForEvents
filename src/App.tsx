@@ -915,7 +915,7 @@ export default function App() {
             )}
 
             {/* Filters Bar */}
-            <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
+            <div className="relative z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
               {/* Welcome Header */}
               <div className="mb-6">
                 <h1 className="text-3xl font-bold text-slate-900">Подберите мероприятие с помощью AI-Агента!</h1>
