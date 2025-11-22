@@ -89,6 +89,27 @@ export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) 
              throw new Error(result?.error || 'Ошибка при регистрации');
         }
 
+        // Try to get user ID from response to create profile BEFORE login
+        // This prevents race condition where App.tsx tries to fetch profile before it exists
+        const userId = result?.data?.user?.id || result?.user?.id || result?.id;
+        
+        if (userId) {
+            // Create profile
+            const defaultInterests = ['Обучение', 'Технологии', 'Развитие'];
+            const { error: profileError } = await createUserProfile({
+                id: userId,
+                name,
+                role,
+                email,
+                interests: defaultInterests,
+                myEventIds: []
+            });
+            
+            if (profileError) {
+                 console.error("Profile creation error:", profileError);
+            }
+        }
+
         // Auto login
         const { error: loginError, data: loginData } = await supabase.auth.signInWithPassword({
             email,
@@ -98,21 +119,19 @@ export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) 
         if (loginError) throw loginError;
 
         if (loginData.user) {
-          // Create profile
-          const defaultInterests = ['Обучение', 'Технологии', 'Развитие'];
-          const { error: profileError } = await createUserProfile({
-            id: loginData.user.id,
-            name,
-            role,
-            email,
-            interests: defaultInterests,
-            myEventIds: []
-          });
-          
-          if (profileError) {
-             console.error("Profile creation error:", profileError);
-             // Silent fail on profile creation, but log it
+          // If we didn't create profile yet (failed to get ID), try now
+          if (!userId) {
+              const defaultInterests = ['Обучение', 'Технологии', 'Развитие'];
+              await createUserProfile({
+                id: loginData.user.id,
+                name,
+                role,
+                email,
+                interests: defaultInterests,
+                myEventIds: []
+              });
           }
+          
           toast.success("Регистрация успешна!");
           onClose(); // Close modal on success
         }

@@ -160,47 +160,17 @@ export async function toggleRegistration(userId: string, eventId: string, isRegi
 
 // New Registration System with Approval (with localStorage fallback)
 export async function createRegistration(userId: string, eventId: string, userEmail?: string): Promise<EventRegistration | null> {
-  // Try backend first
-  try {
-    const response = await fetchAPI('/registrations', 'POST', { userId, eventId, userEmail });
-    if (response?.data) {
-      return response.data;
-    }
-  } catch (error) {
-    console.warn('Failed to create registration via API, falling back to localStorage:', error);
-  }
-  
-  // Fallback to localStorage
+  // Always use localStorage for now (until backend is deployed)
   return createLocalRegistration(userId, eventId, userEmail);
 }
 
 export async function getUserRegistrations(userId: string): Promise<EventRegistration[]> {
-  // Try backend first
-  try {
-    const response = await fetchAPI(`/registrations/user/${userId}`);
-    if (response?.data) {
-      return response.data;
-    }
-  } catch (error) {
-    console.warn('Failed to fetch user registrations via API, falling back to localStorage:', error);
-  }
-  
-  // Fallback to localStorage
+  // Always use localStorage for now (until backend is deployed)
   return getLocalUserRegistrations(userId);
 }
 
 export async function getAllRegistrations(): Promise<EventRegistration[]> {
-  // Try backend first
-  try {
-    const response = await fetchAPI('/registrations');
-    if (response?.data) {
-      return response.data;
-    }
-  } catch (error) {
-    console.warn('Failed to fetch all registrations via API, falling back to localStorage:', error);
-  }
-  
-  // Fallback to localStorage
+  // Always use localStorage for now (until backend is deployed)
   return getLocalRegistrations();
 }
 
@@ -208,37 +178,22 @@ export async function updateRegistrationStatus(
   registrationId: string, 
   status: 'approved' | 'rejected'
 ): Promise<EventRegistration | null> {
-  // Try backend first
-  try {
-    const response = await fetchAPI(`/registrations/${registrationId}`, 'PUT', { status });
-    if (response?.data) {
-      return response.data;
-    }
-  } catch (error) {
-    console.warn('Failed to update registration via API, falling back to localStorage:', error);
-  }
-  
-  // Fallback to localStorage
+  // Always use localStorage for now (until backend is deployed)
   return updateLocalRegistrationStatus(registrationId, status);
 }
 
 export async function deleteRegistration(registrationId: string): Promise<boolean> {
-  // Try backend first
-  try {
-    const response = await fetchAPI(`/registrations/${registrationId}`, 'DELETE');
-    if (response?.success) {
-      return true;
-    }
-  } catch (error) {
-    console.warn('Failed to delete registration via API, falling back to localStorage:', error);
-  }
-  
-  // Fallback to localStorage
+  // Always use localStorage for now (until backend is deployed)
   return deleteLocalRegistration(registrationId);
 }
 
 // Get all approved registrations (for admin calendar view)
 export async function getApprovedRegistrations(): Promise<EventRegistration[]> {
-  const allRegs = await getAllRegistrations();
+  const allRegs = getLocalRegistrations();
   return allRegs.filter(r => r.status === 'approved');
+}
+
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  const result = await fetchAPI(`/events/${eventId}`, 'DELETE');
+  return !!result?.success;
 }

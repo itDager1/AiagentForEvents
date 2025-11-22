@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, MapPin, Clock, Users, ArrowRight, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, ArrowRight, Loader2, Trash2 } from 'lucide-react';
 import { Event, RegistrationStatus } from '../../data/mock';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -12,11 +12,13 @@ interface EventCardProps {
   onToggleRegister: (id: string) => void;
   onClick?: () => void;
   isAdmin?: boolean;
+  onDelete?: (id: string) => void;
 }
 
-export function EventCard({ event, registrationStatus, onToggleRegister, onClick, isAdmin }: EventCardProps) {
+export function EventCard({ event, registrationStatus, onToggleRegister, onClick, isAdmin, onDelete }: EventCardProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [justRegistered, setJustRegistered] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const handleToggleRegister = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -41,12 +43,29 @@ export function EventCard({ event, registrationStatus, onToggleRegister, onClick
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Вы уверены, что хотите удалить это мероприятие?')) {
+        setIsDeleting(true);
+        if (onDelete) {
+            await onDelete(event.id);
+        }
+        setIsDeleting(false);
+    }
+  };
+
   return (
     !['Волонтерство', 'Спорт', 'Корпоратив'].includes(event.category as any) ? (
     <Card 
       onClick={onClick}
-      className="group overflow-hidden border-transparent shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col h-full rounded-3xl bg-white ring-1 ring-slate-100 cursor-pointer"
+      className="group overflow-hidden border-transparent shadow-sm hover:shadow-xl hover:shadow-blue-900/5 transition-all duration-300 flex flex-col h-full rounded-3xl bg-white ring-1 ring-slate-100 cursor-pointer relative"
     >
+      {onDelete && (
+        <div className="absolute top-3 right-3 z-20">
+
+        </div>
+      )}
+
       <div className="relative h-52 overflow-hidden m-2 rounded-2xl">
         <ImageWithFallback 
           src={event.image} 
@@ -64,6 +83,7 @@ export function EventCard({ event, registrationStatus, onToggleRegister, onClick
               Online
             </Badge>
           )}
+
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 text-white flex items-center justify-between text-xs font-medium">
@@ -105,9 +125,9 @@ export function EventCard({ event, registrationStatus, onToggleRegister, onClick
             registrationStatus === 'approved'
               ? 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300' 
               : registrationStatus === 'pending' && !isAdmin
-              ? 'border-orange-200 bg-orange-50 text-slate-900 cursor-not-allowed'
+              ? 'border-orange-200 bg-orange-50 text-orange-600 cursor-not-allowed'
               : registrationStatus === 'pending' && isAdmin
-              ? 'border-orange-200 bg-orange-50 text-slate-900 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+              ? 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
               : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40'
           } ${isLoading ? 'opacity-80 cursor-not-allowed' : ''}`}
           onClick={handleToggleRegister}

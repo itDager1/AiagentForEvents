@@ -26,16 +26,15 @@ import {
   createRegistration,
   getUserRegistrations,
   getApprovedRegistrations,
-  deleteRegistration
+  deleteRegistration,
+  deleteEvent
 } from './utils/dbService';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { logApiKeyStatus, checkApiKeyStatus } from './utils/checkApiKey';
-import { checkAndCreateNotifications, deleteEventNotifications } from './utils/notificationService';
-import { migrateLocalRegistrationsToSupabase, needsMigration } from './utils/migrationService';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'catalog' | 'profile' | 'admin'>('catalog');
+  const [view, setView] = useState<'myevents' | 'profile' | 'admin'>('myevents'); // Changed from 'catalog' to 'myevents'
   const [events, setEvents] = useState<Event[]>([]); // Start empty, fetch from DB
   const [loading, setLoading] = useState(true);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -52,7 +51,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<EventCategory | 'All'>('All');
-  const [formatFilter, setFormatFilter] = useState<'All' | 'Онлайн' | 'Оффлайн'>('All');
+  const [formatFilter, setFormatFilter] = useState<'All' | 'Онлайн' | 'Офф��айн'>('All');
   const [sortOrder, setSortOrder] = useState<'date_asc' | 'date_desc' | 'title_asc'>('date_asc');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -138,29 +137,17 @@ export default function App() {
         console.log('');
       }
 
-      // 1. Migrate local registrations to Supabase if needed
-      if (needsMigration()) {
-        console.log('🔄 Обнаружены локальные заявки, выполняю миграцию в Supabase...');
-        const migrationResult = await migrateLocalRegistrationsToSupabase();
-        if (migrationResult.success && migrationResult.migrated > 0) {
-          console.log(`✅ Мигрировано ${migrationResult.migrated} заявок в Supabase`);
-          toast.success(`Заявки синхронизированы с сервером (${migrationResult.migrated} шт.)`);
-        } else if (migrationResult.errors > 0) {
-          console.warn(`⚠️ Ошибки при миграции: ${migrationResult.errors}`);
-        }
-      }
-
-      // 2. Seed events if needed
+      // 1. Seed events if needed
       console.log('📊 Загрузка событий...');
       await seedEvents();
 
-      // 3. Fetch events
+      // 2. Fetch events
       const fetchedEvents = await fetchEvents();
       setEvents(fetchedEvents);
       console.log(`✅ Загружено ${fetchedEvents.length} событий`);
       console.log('');
 
-      // 4. Check current session
+      // 3. Check current session
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -189,7 +176,7 @@ export default function App() {
     
     init();
 
-    // 5. Listen for auth changes
+    // 4. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await getUserProfile(session.user.id);
@@ -229,7 +216,7 @@ export default function App() {
         // ignore
     }
     setUser(null);
-    setView('catalog');
+    setView('myevents');
   };
 
   const handleMockLogin = (name: string, role: Role, email: string) => {
@@ -263,7 +250,7 @@ export default function App() {
       if (adminUser.isAdmin) {
         setView('admin'); // Only open admin panel if actually admin
       } else {
-        setView('catalog');
+        setView('myevents');
       }
   };
 
@@ -328,9 +315,6 @@ export default function App() {
             setUser(updatedUser);
             await createUserProfile(updatedUser);
             
-            // Delete all notifications for this event
-            deleteEventNotifications(user.id, eventId);
-            
             toast.success("Запись отменена");
           } else {
             toast.error("Ошибка при отмене записи");
@@ -343,7 +327,7 @@ export default function App() {
       
       // For non-admin users, show appropriate message
       if (existingReg.status === 'pending') {
-        toast.info("Ваша заявка ожидает одобрения администратора");
+        toast.info("Ваша заявка ожидает одобре��ия администратора");
       } else if (existingReg.status === 'approved') {
         toast.info("Вы уже записаны на это мероприятие");
       } else {
@@ -434,35 +418,6 @@ export default function App() {
         }
         return 0;
     });
-
-  // Check and create notifications for approved events
-  useEffect(() => {
-    if (!user || !events.length) return;
-    
-    const checkNotifications = () => {
-      // Filter approved registrations
-      const approvedRegs = userRegistrations.filter(r => r.status === 'approved');
-      
-      // Check and create notifications
-      const newNotifications = checkAndCreateNotifications(user.id, approvedRegs, events);
-      
-      // Show toast for new notifications
-      if (newNotifications.length > 0) {
-        newNotifications.forEach(notif => {
-          toast.info(notif.message, {
-            duration: 5000,
-          });
-        });
-      }
-    };
-    
-    checkNotifications();
-    
-    // Check notifications every hour
-    const interval = setInterval(checkNotifications, 3600000);
-    
-    return () => clearInterval(interval);
-  }, [user, userRegistrations, events]);
 
   if (loading) {
       return <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
@@ -963,7 +918,7 @@ export default function App() {
             <div className="sticky top-20 z-40 bg-white/95 backdrop-blur-xl p-6 rounded-3xl border-2 border-blue-100 shadow-xl shadow-blue-900/5">
               {/* Welcome Header */}
               <div className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900">Добро пожаловать!</h1>
+                <h1 className="text-3xl font-bold text-slate-900">Подберите мероприятие с помощью AI-Агента!</h1>
               </div>
               
               {/* Top Row - AI Button */}
@@ -1155,6 +1110,15 @@ export default function App() {
                         onToggleRegister={toggleRegister}
                         onClick={() => setSelectedEvent(event)}
                         isAdmin={user?.isAdmin && user?.email === 'admin@sberbank.ru'}
+                        onDelete={async (id) => {
+                          const success = await deleteEvent(id);
+                          if (success) {
+                            setEvents(prev => prev.filter(e => e.id !== id));
+                            toast.success("Мероприятие удалено");
+                          } else {
+                            toast.error("Не удалось удалить мероприятие");
+                          }
+                        }}
                       />
                     ))}
                   </div>
