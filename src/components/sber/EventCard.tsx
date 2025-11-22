@@ -1,6 +1,6 @@
 import React from 'react';
-import { Calendar, MapPin, Clock, Users, ArrowRight } from 'lucide-react';
-import { Event } from '../../data/mock';
+import { Calendar, MapPin, Clock, Users, ArrowRight, Loader2 } from 'lucide-react';
+import { Event, RegistrationStatus } from '../../data/mock';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardFooter } from '../ui/card';
@@ -8,12 +8,39 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 
 interface EventCardProps {
   event: Event;
-  isRegistered?: boolean;
+  registrationStatus?: RegistrationStatus | null;
   onToggleRegister: (id: string) => void;
   onClick?: () => void;
+  isAdmin?: boolean;
 }
 
-export function EventCard({ event, isRegistered, onToggleRegister, onClick }: EventCardProps) {
+export function EventCard({ event, registrationStatus, onToggleRegister, onClick, isAdmin }: EventCardProps) {
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [justRegistered, setJustRegistered] = React.useState(false);
+
+  const handleToggleRegister = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsLoading(true);
+    
+    try {
+      await onToggleRegister(event.id);
+      // Небольшая задержка для визуального эффекта
+      setTimeout(() => {
+        setIsLoading(false);
+        // Если пользователь записался (а не отменил запись)
+        if (!registrationStatus) {
+          setJustRegistered(true);
+          // Через 3 секунды убираем сообщение "✓ Заявка отправлена"
+          setTimeout(() => {
+            setJustRegistered(false);
+          }, 3000);
+        }
+      }, 500);
+    } catch (error) {
+      setIsLoading(false);
+    }
+  };
+
   return (
     !['Волонтерство', 'Спорт', 'Корпоратив'].includes(event.category as any) ? (
     <Card 
@@ -72,18 +99,34 @@ export function EventCard({ event, isRegistered, onToggleRegister, onClick }: Ev
 
       <CardFooter className="p-6 pt-0">
         <Button 
-          variant={isRegistered ? "outline" : "default"}
+          variant={registrationStatus === 'approved' ? "outline" : "default"}
+          disabled={isLoading || (registrationStatus === 'pending' && !isAdmin)}
           className={`w-full h-11 rounded-xl font-medium transition-all duration-300 ${
-            isRegistered 
+            registrationStatus === 'approved'
               ? 'border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300' 
+              : registrationStatus === 'pending' && !isAdmin
+              ? 'border-orange-200 bg-orange-50 text-slate-900 cursor-not-allowed'
+              : registrationStatus === 'pending' && isAdmin
+              ? 'border-orange-200 bg-orange-50 text-slate-900 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
               : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40'
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleRegister(event.id);
-          }}
+          } ${isLoading ? 'opacity-80 cursor-not-allowed' : ''}`}
+          onClick={handleToggleRegister}
         >
-          {isRegistered ? (
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              Записываем...
+            </>
+          ) : justRegistered ? (
+            <>
+              ✓ Заявка отправлена
+            </>
+          ) : registrationStatus === 'pending' ? (
+            <>
+              Заявка отправлена
+              {isAdmin && <span className="ml-2 opacity-60 text-xs">(Отменить)</span>}
+            </>
+          ) : registrationStatus === 'approved' ? (
             <>
               Вы записаны
               <span className="ml-2 opacity-60 text-xs">(Отменить)</span>

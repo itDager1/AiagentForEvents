@@ -7,7 +7,7 @@ import { UserProfile } from './components/sber/UserProfile';
 import { EventDetailsModal } from './components/sber/EventDetailsModal';
 import { ApiKeySetupNotice } from './components/sber/ApiKeySetupNotice';
 import { AdminPanel } from './components/sber/AdminPanel';
-import { MOCK_EVENTS, User, Event, EventCategory, Role, EventRegistration } from './data/mock';
+import { MOCK_EVENTS, User, Event, EventCategory, Role, EventRegistration, RegistrationStatus } from './data/mock';
 import { getAIRecommendations } from './utils/aiService';
 import { Button } from './components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
@@ -25,10 +25,13 @@ import {
   createUserProfile,
   createRegistration,
   getUserRegistrations,
-  getApprovedRegistrations
+  getApprovedRegistrations,
+  deleteRegistration
 } from './utils/dbService';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { logApiKeyStatus, checkApiKeyStatus } from './utils/checkApiKey';
+import { checkAndCreateNotifications, deleteEventNotifications } from './utils/notificationService';
+import { migrateLocalRegistrationsToSupabase, needsMigration } from './utils/migrationService';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -135,17 +138,29 @@ export default function App() {
         console.log('');
       }
 
-      // 1. Seed events if needed
+      // 1. Migrate local registrations to Supabase if needed
+      if (needsMigration()) {
+        console.log('🔄 Обнаружены локальные заявки, выполняю миграцию в Supabase...');
+        const migrationResult = await migrateLocalRegistrationsToSupabase();
+        if (migrationResult.success && migrationResult.migrated > 0) {
+          console.log(`✅ Мигрировано ${migrationResult.migrated} заявок в Supabase`);
+          toast.success(`Заявки синхронизированы с сервером (${migrationResult.migrated} шт.)`);
+        } else if (migrationResult.errors > 0) {
+          console.warn(`⚠️ Ошибки при миграции: ${migrationResult.errors}`);
+        }
+      }
+
+      // 2. Seed events if needed
       console.log('📊 Загрузка событий...');
       await seedEvents();
 
-      // 2. Fetch events
+      // 3. Fetch events
       const fetchedEvents = await fetchEvents();
       setEvents(fetchedEvents);
       console.log(`✅ Загружено ${fetchedEvents.length} событий`);
       console.log('');
 
-      // 3. Check current session
+      // 4. Check current session
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -174,7 +189,7 @@ export default function App() {
     
     init();
 
-    // 4. Listen for auth changes
+    // 5. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const profile = await getUserProfile(session.user.id);
@@ -297,7 +312,36 @@ export default function App() {
     const existingReg = userRegistrations.find(r => r.eventId === eventId);
     
     if (existingReg) {
-      // Already has a registration
+      // Admin can cancel approved and pending registrations
+      if (user.isAdmin && user.email === 'admin@sberbank.ru' && (existingReg.status === 'approved' || existingReg.status === 'pending')) {
+        try {
+          const success = await deleteRegistration(existingReg.id);
+          if (success) {
+            // Remove from local state
+            setUserRegistrations(prev => prev.filter(r => r.id !== existingReg.id));
+            
+            // Remove from user's myEventIds
+            const updatedUser = {
+              ...user,
+              myEventIds: user.myEventIds.filter(id => id !== eventId)
+            };
+            setUser(updatedUser);
+            await createUserProfile(updatedUser);
+            
+            // Delete all notifications for this event
+            deleteEventNotifications(user.id, eventId);
+            
+            toast.success("Запись отменена");
+          } else {
+            toast.error("Ошибка при отмене записи");
+          }
+        } catch (error) {
+          toast.error("Ошибка при отмене записи");
+        }
+        return;
+      }
+      
+      // For non-admin users, show appropriate message
       if (existingReg.status === 'pending') {
         toast.info("Ваша заявка ожидает одобрения администратора");
       } else if (existingReg.status === 'approved') {
@@ -334,9 +378,9 @@ export default function App() {
   };
   
   // Helper function to get registration status for an event
-  const getRegistrationStatus = (eventId: string): 'none' | 'pending' | 'approved' | 'rejected' => {
+  const getRegistrationStatus = (eventId: string): RegistrationStatus | null => {
     const reg = userRegistrations.find(r => r.eventId === eventId);
-    return reg ? reg.status : 'none';
+    return reg ? reg.status : null;
   };
 
   const handleAskAI = async () => {
@@ -390,6 +434,35 @@ export default function App() {
         }
         return 0;
     });
+
+  // Check and create notifications for approved events
+  useEffect(() => {
+    if (!user || !events.length) return;
+    
+    const checkNotifications = () => {
+      // Filter approved registrations
+      const approvedRegs = userRegistrations.filter(r => r.status === 'approved');
+      
+      // Check and create notifications
+      const newNotifications = checkAndCreateNotifications(user.id, approvedRegs, events);
+      
+      // Show toast for new notifications
+      if (newNotifications.length > 0) {
+        newNotifications.forEach(notif => {
+          toast.info(notif.message, {
+            duration: 5000,
+          });
+        });
+      }
+    };
+    
+    checkNotifications();
+    
+    // Check notifications every hour
+    const interval = setInterval(checkNotifications, 3600000);
+    
+    return () => clearInterval(interval);
+  }, [user, userRegistrations, events]);
 
   if (loading) {
       return <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
@@ -567,7 +640,7 @@ export default function App() {
                                    </>
                                  ) : (
                                    <>
-                                     За��исаться
+                                     Заисаться
                                      <ArrowRight className="w-4 h-4 ml-2" />
                                    </>
                                  )}
@@ -730,9 +803,10 @@ export default function App() {
                         <EventCard 
                           key={event.id} 
                           event={event} 
-                          isRegistered={user?.myEventIds.includes(event.id)}
+                          registrationStatus={getRegistrationStatus(event.id)}
                           onToggleRegister={toggleRegister}
                           onClick={() => setSelectedEvent(event)}
+                          isAdmin={user?.isAdmin && user?.email === 'admin@sberbank.ru'}
                         />
                       ))}
                     </div>
@@ -790,7 +864,7 @@ export default function App() {
                     <Sparkles className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Пер��ональные рекомендации</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">Персональные рекомендации</h2>
                     <p className="text-slate-500 text-sm">Подобрано специально для вас на основе ваших интересов и графика</p>
                   </div>
                 </div>
@@ -1077,9 +1151,10 @@ export default function App() {
                       <EventCard 
                         key={event.id} 
                         event={event} 
-                        isRegistered={user?.myEventIds.includes(event.id)}
+                        registrationStatus={getRegistrationStatus(event.id)}
                         onToggleRegister={toggleRegister}
                         onClick={() => setSelectedEvent(event)}
+                        isAdmin={user?.isAdmin && user?.email === 'admin@sberbank.ru'}
                       />
                     ))}
                   </div>

@@ -166,7 +166,7 @@ export function Auth({ isOpen, onClose, onMockLogin, onAdminLogin }: AuthProps) 
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-500 rounded-xl mx-auto flex items-center justify-center text-white mb-4 shadow-lg shadow-blue-600/30">
               <Sparkles className="w-6 h-6" />
             </div>
-            <CardTitle className="text-2xl font-bold text-slate-900">Sber<span className="text-blue-600">Events</span></CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-900">Sber<span className="text-blue-600">Exact Direction</span></CardTitle>
             <CardDescription className="text-slate-500 mt-2">
               Вход в систему
             </CardDescription>

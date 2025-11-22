@@ -15,6 +15,7 @@ import { User } from '../../data/mock';
 import compassLogo from 'figma:asset/4d5fe6b6dc3105a55dec739d26b364ba01b8168a.png';
 import { ApiKeyStatusBadge } from './ApiKeyStatusBadge';
 import { AIBadge } from './AIBadge';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   user: User | null;
@@ -24,9 +25,10 @@ interface HeaderProps {
   onEventsClick: () => void;
   onCalendarClick?: () => void;
   onAdminClick?: () => void;
+  onNotificationChange?: () => void;
 }
 
-export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsClick, onCalendarClick, onAdminClick }: HeaderProps) {
+export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsClick, onCalendarClick, onAdminClick, onNotificationChange }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 border-b border-blue-100/50 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
@@ -61,6 +63,14 @@ export function Header({ user, onLogout, onProfileClick, onLoginClick, onEventsC
           
           {/* API Key Status Badge (dev mode only) */}
           <ApiKeyStatusBadge />
+          
+          {/* Notification Bell - only for logged in users */}
+          {user && (
+            <NotificationBell 
+              userId={user.id} 
+              onNotificationChange={onNotificationChange}
+            />
+          )}
           
           {user ? (
             <>

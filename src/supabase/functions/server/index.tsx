@@ -167,7 +167,7 @@ app.post('/signup', async (c) => {
  Пожалуйста, верни информацию в формате JSON:
  {
    "title": "Точное название мероприятия (включая номер, если это митап)",
-   "description": "Подр��бное описание мероприятия (2-3 предложения)",
+   "description": "Подрбное описание мероприятия (2-3 предложения)",
    "date": "Дата начала в формате ISO (YYYY-MM-DDTHH:mm:ss)",
    "displayDate": "Красиво отформатированная дата для отображения (например, '27–28 ноября 2025')",
    "format": "Онлайн" | "Оффлайн" | "Гибрид",
@@ -183,7 +183,7 @@ app.post('/signup', async (c) => {
  - Если название содержит номер (например, Moscow Python Meetup #90), ОБЯЗАТЕЛЬНО проверь, какой номер актуален сейчас. Не используй старые номера.
  - Если мероприятие регулярное (митап), найди информацию именно о БЛИЖАЙШЕМ.
  - Даты должны быть точными.
- - Найди 3-5 ключевых п��ртнеров или спонсоров события.
+ - Найди 3-5 ключевых пртнеров или спонсоров события.
  - Если партнеры не найдены, верни пустой массив [].
  - Если мероприятие не найдено или информация устарела, верни null.
  - Формат даты ISO: YYYY-MM-DDTHH:mm:ss.
@@ -203,7 +203,7 @@ app.post('/signup', async (c) => {
           body: JSON.stringify({
             "model": "perplexity/sonar",
             "messages": [
-              {"role": "system", "content": "Ты - эксперт по IT-мероприятиям. Ты находишь актуальную информацию о конференциях, хакатонах и митапах. Всегд�� возвращай валидный JSON с точными датами или null, если информация недоступна."},
+              {"role": "system", "content": "Ты - эксперт по IT-мероприятиям. Ты находишь актуальную информацию о конференциях, хакатонах и митапах. Всегд возвращай валидный JSON с точными датами или null, если информация недоступна."},
               {"role": "user", "content": prompt}
             ],
             "temperature": 0.1,
@@ -441,28 +441,32 @@ app.post('/signup', async (c) => {
 // Event Registration Endpoints (Approval System)
 app.post('/registrations', async (c) => {
   try {
-    const { userId, eventId } = await c.req.json();
+    const body = await c.req.json();
+    const { userId, eventId, status, createdAt, updatedAt, id, userEmail } = body;
     
     // Get existing registrations
     const allRegistrations = await kv.get('registrations') || [];
     
-    // Check if registration already exists
+    // Check if registration already exists (by id or userId+eventId)
     const existing = allRegistrations.find(
-      (r: any) => r.userId === userId && r.eventId === eventId
+      (r: any) => (id && r.id === id) || (r.userId === userId && r.eventId === eventId)
     );
     
     if (existing) {
       return c.json({ data: existing });
     }
     
-    // Create new registration with pending status
+    // Auto-approve for admin users
+    const isAdmin = userEmail === 'admin@sberbank.ru';
+    
+    // Create new registration
     const registration = {
-      id: `reg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: id || `reg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       userId,
       eventId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      status: status || (isAdmin ? 'approved' : 'pending'),
+      createdAt: createdAt || new Date().toISOString(),
+      updatedAt: updatedAt || new Date().toISOString()
     };
     
     allRegistrations.push(registration);
